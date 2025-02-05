@@ -1,0 +1,62 @@
+#include "blade/memory/base.hh"
+
+using namespace Blade;
+
+
+// CUDA kernel to compute sk_array
+__global__ void computeSkArray(
+    comp_float_t* block,
+    int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
+
+
+    // Compute indices
+    int ant = blockIdx.x;    // Antenna index
+    int chan = blockIdx.y;   // Channel index
+    int pol = threadIdx.x;   // Polarization index
+
+    if (ant < N_ANTS && chan < N_CHANS && pol < N_POLS) {
+        // Initialize sums
+        float s1 = 0.0f;
+        float s2 = 0.0f;
+
+        // Compute s1 (sum of elements) and s2 (sum of squares)
+        for (int samp = 0; samp < N_SAMPS; samp++) {
+            int idx = ((ant * N_CHANS + chan) * N_SAMPS + samp) * N_POLS + pol;
+            comp_float_t value = block[idx];
+
+            float v2 = value.real * value.real + value.imag * value.imag;
+
+            s1 += v2;
+            s2 += v2 * v2;
+        }
+
+        // Compute sk value
+        float sk = ((N_SAMPS + 1.0f) / (N_SAMPS - 1.0f)) * ((N_SAMPS * (s2 / (s1 * s1))) - 1.0f);
+
+        // based on sk we can zap the channel
+        // TODO: change sk thresholds / properly apply from sklim
+        if (sk > 3) {
+            int chan_start = ((ant * N_CHANS + chan) * N_SAMPS + 0) * N_POLS + pol;
+            for (int j = chan_start; j < chan_start + N_SAMPS * N_POLS; j = j + N_POLS) {
+                block[j].real = 0.0;
+                block[j].imag = 0.0;
+            }
+        }
+
+        // Write the result to the output array
+        // int out_idx = ((ant * N_CHANS + chan) * 1 + 0) * N_POLS + pol;
+        // output[out_idx] = sk;
+    }
+}
+
+// Host function to call the kernel
+void calculateSkArray(
+    comp_float_t* d_block,
+    int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
+
+    dim3 gridDim(N_ANTS, N_CHANS);    // One block per antenna and channel
+    dim3 blockDim(N_POLS);           // One thread per polarization
+
+    computeSkArray<<<gridDim, blockDim>>>(
+        d_block, N_ANTS, N_CHANS, N_SAMPS, N_POLS);//, m);
+}
