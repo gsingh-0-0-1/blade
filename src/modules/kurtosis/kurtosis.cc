@@ -1,0 +1,75 @@
+#define BL_LOG_DOMAIN "M::KURTOSIS"
+
+#include <type_traits>
+#include <typeindex>
+
+#include "blade/modules/kurtosis.hh"
+
+#include "kurtosis.jit.hh"
+
+namespace Blade::Modules {
+
+template<typename IT, typename OT>
+Kurtosis<IT, OT>::Kurtosis(const Config& config, 
+                             const Input& input, 
+                             const Stream& stream)
+        : Module(kurtosis_program),
+          config(config),
+          input(input) {
+    // Configure kernel instantiation.
+    BL_CHECK_THROW(
+        this->createKernel(
+            // Kernel name.
+            "main",
+            // Kernel function key.
+            "calculateSkArray",
+            // Kernel grid & block size.
+            PadGridSize(
+                getInputBuffer().size(), 
+                config.blockSize
+            ),
+            config.blockSize,
+            // Kernel templates.
+            TypeInfo<IT>::name,
+            TypeInfo<OT>::name
+        )
+    );
+
+    if constexpr (!std::is_same<IT, OT>::value) {
+        BL_FATAL("This module requires the type of the input "
+                 "({}) and output ({}) to be the same.",
+                 TypeInfo<IT>::name, TypeInfo<OT>::name); 
+        BL_INFO("Contact the maintainer if this "
+                "functionality is required.");
+        BL_CHECK_THROW(Result::ERROR);
+    }
+
+    // Link output buffers.
+    // if (config.inputPolarization == config.outputPolarization) {
+    //     BL_INFO("Bypass: Enabled");
+    // }
+
+    // Link output buffer or link input with output.
+    // BL_CHECK_THROW(Link(output.buf, input.buf));
+
+    // Print configuration values.
+    BL_INFO("Type: {} -> {}", TypeInfo<IT>::name, TypeInfo<OT>::name);
+    BL_INFO("Shape: {} -> {}", getInputBuffer().shape(), 
+                              getOutputBuffer().shape());
+}
+
+template<typename IT, typename OT>
+Result Kurtosis<IT, OT>::process(const U64& currentStepCount, const Stream& stream) {
+    /*
+    if (config.inputPolarization == config.outputPolarization) {
+        return Result::SUCCESS;
+    }
+    */
+
+    return this->runKernel("main", stream, input.buf, output.buf);
+}
+
+template class BLADE_API Kurtosis<CF32, CF32>;
+template class BLADE_API Kurtosis<CF16, CF16>;
+
+}  // namespace Blade::Modules
