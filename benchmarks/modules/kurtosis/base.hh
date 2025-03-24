@@ -15,15 +15,15 @@ class KurtosisTest : CudaBenchmark {
     ArrayTensor<Device::CUDA, IT> deviceInputBuf;
 
     Result run(benchmark::State& state) {
-        const U64 A = state.range(0);
-        const U8 M = state.range(1);
+        // const U64 A = state.range(20);
+        // const U8 M = state.range(1);
 
         InitAndProfile([&](){
             // config.inputPolarization = POL::XY;
             // config.outputPolarization = static_cast<POL>(M);
             config.blockSize = 512;
 
-            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({A, 192, 8192, 2});
+            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({20, 192, 8192, 2});
 
             BL_DISABLE_PRINT();
             Create(module, config, {

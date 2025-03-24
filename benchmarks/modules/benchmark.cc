@@ -42,4 +42,8 @@
 #include "./beamformer/vla.hh"
 #endif
 
+#if defined(BLADE_MODULE_KURTOSIS)
+#include "./kurtosis/generic.hh"
+#endif
+
 BENCHMARK_MAIN();

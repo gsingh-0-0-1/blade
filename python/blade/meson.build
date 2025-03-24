@@ -124,6 +124,18 @@ if cfg_lst.get('BLADE_MODULE_POLARIZER', false)
     )
 endif
 
+if cfg_lst.get('BLADE_MODULE_KURTOSIS', false)
+    py.extension_module(
+        '_kurtosis_impl',
+        sources: 'ext_kurtosis.cc',
+        include_directories: inc_lst,
+        dependencies: deps + dep_lst,
+        link_with: lib_blade,
+        install: true,
+        install_dir: py_install_path,
+    )
+endif
+
 if cfg_lst.get('BLADE_MODULE_PERMUTATION', false)
     py.extension_module(
         '_permutation_impl',

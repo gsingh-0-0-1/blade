@@ -62,6 +62,9 @@ if __name__ == "__main__":
     np.copyto(bl_input, np.random.random(size=input_shape)+1j*np.random.random(size=input_shape))
     np.copyto(bl_phasors, np.random.random(size=phasor_shape)+1j*np.random.random(size=phasor_shape))
 
+    # we can "pollute" the data if we want
+    
+
     #
     # Blade Implementation
     #
@@ -116,8 +119,15 @@ if __name__ == "__main__":
 
     #
     # Compare Results
-    #
+    # Since kurtosis does an in-place modification
+    # maybe we want to compare bl_input with py_output?
 
-    assert np.allclose(bl_output[:-1, :, :, :], py_output[:-1, :, :, :], rtol=0.01)
-    assert np.allclose(bl_output[-1, :, :, :], py_output[-1, :, :, :], atol=250)
+    assert np.allclose(bl_input[:-1, :, :, :], py_output[:-1, :, :, :], rtol=0.01)
+    assert np.allclose(bl_input[-1, :, :, :], py_output[-1, :, :, :], atol=250)
+
+    # assert np.allclose(bl_output[:-1, :, :, :], py_output[:-1, :, :, :], rtol=0.01)
+    # assert np.allclose(bl_output[-1, :, :, :], py_output[-1, :, :, :], atol=250)
+    
+
+
     print("Test successfully completed!")

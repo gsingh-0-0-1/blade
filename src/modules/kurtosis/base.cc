@@ -22,7 +22,7 @@ Kurtosis<IT, OT>::Kurtosis(const Config& config,
             // Kernel name.
             "main",
             // Kernel function key.
-            "calculateSkArray",
+            "get_sk_array",
             // Kernel grid & block size.
             PadGridSize(
                 getInputBuffer().size(), 
@@ -50,7 +50,7 @@ Kurtosis<IT, OT>::Kurtosis(const Config& config,
     // }
 
     // Link output buffer or link input with output.
-    // BL_CHECK_THROW(Link(output.buf, input.buf));
+    BL_CHECK_THROW(Link(output.buf, input.buf));
 
     // Print configuration values.
     BL_INFO("Type: {} -> {}", TypeInfo<IT>::name, TypeInfo<OT>::name);
@@ -66,7 +66,14 @@ Result Kurtosis<IT, OT>::process(const U64& currentStepCount, const Stream& stre
     }
     */
 
-    return this->runKernel("main", stream, input.buf, output.buf);
+    return this->runKernel("main", 
+            stream, 
+            input.buf.data(), 
+            getInputBuffer().shape().numberOfAspects(), 
+            getInputBuffer().shape().numberOfFrequencyChannels(), 
+            getInputBuffer().shape().numberOfTimeSamples(), 
+            getInputBuffer().shape().numberOfPolarizations()
+        );
 }
 
 template class BLADE_API Kurtosis<CF32, CF32>;

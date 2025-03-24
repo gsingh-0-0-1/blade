@@ -1,4 +1,5 @@
 #include "blade/memory/base.hh"
+#include "cuComplex.h"
 
 using namespace Blade;
 
@@ -26,11 +27,11 @@ float SKLIM_VALS[] = {
     0.649093, 1.69044,
     // STD 5, CHUNK 1024
     0.740405, 1.42332
-}
+};
 
 // CUDA kernel to compute sk_array
-__global__ void computeSkArray(
-    comp_float_t* block,
+__global__ void compute_sk_array(
+    cuFloatComplex* block,
     int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
 
 
@@ -62,9 +63,9 @@ __global__ void computeSkArray(
         // Compute s1 (sum of elements) and s2 (sum of squares)
         for (int samp = 0; samp < N_SAMPS; samp++) {
             int idx = ((ant * N_CHANS + chan) * N_SAMPS + samp) * N_POLS + pol;
-            comp_float_t value = block[idx];
+            cuFloatComplex value = block[idx];
 
-            float v2 = value.real * value.real + value.imag * value.imag;
+            float v2 = value.x * value.x + value.y * value.y;
 
             s1 += v2;
             s2 += v2 * v2;
@@ -77,8 +78,8 @@ __global__ void computeSkArray(
         if (sk > sklim_upper || sk < sklim_lower) {
             int chan_start = ((ant * N_CHANS + chan) * N_SAMPS + 0) * N_POLS + pol;
             for (int j = chan_start; j < chan_start + N_SAMPS * N_POLS; j = j + N_POLS) {
-                block[j].real = 0.0;
-                block[j].imag = 0.0;
+                block[j].x = 0.0;
+                block[j].y = 0.0;
             }
         }
 
@@ -89,13 +90,14 @@ __global__ void computeSkArray(
 }
 
 // Host function to call the kernel
-void calculateSkArray(
-    comp_float_t* d_block,
+template<typename IT, typename OT>
+__global__ void get_sk_array(
+    cuFloatComplex* d_block,
     int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
 
     dim3 gridDim(N_ANTS, N_CHANS);    // One block per antenna and channel
     dim3 blockDim(N_POLS);           // One thread per polarization
 
-    computeSkArray<<<gridDim, blockDim>>>(
+    compute_sk_array<<<gridDim, blockDim>>>(
         d_block, N_ANTS, N_CHANS, N_SAMPS, N_POLS);//, m);
 }

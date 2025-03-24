@@ -11,5 +11,6 @@ subdir('permutation')
 subdir('duplicate')
 subdir('guppi')
 subdir('bfr5')
+subdir('kurtosis')
 
 summary(sum_lst, section: 'Modules', bool_yn: true)
