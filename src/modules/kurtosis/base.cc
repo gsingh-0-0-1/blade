@@ -22,7 +22,7 @@ Kurtosis<IT, OT>::Kurtosis(const Config& config,
             // Kernel name.
             "main",
             // Kernel function key.
-            "get_sk_array",
+            "compute_sk_array",
             // Kernel grid & block size.
             PadGridSize(
                 getInputBuffer().size(), 

@@ -23,7 +23,7 @@ class KurtosisTest : CudaBenchmark {
             // config.outputPolarization = static_cast<POL>(M);
             config.blockSize = 512;
 
-            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({20, 192, 8192, 2});
+            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({20, 192, 256, 2});
 
             BL_DISABLE_PRINT();
             Create(module, config, {
