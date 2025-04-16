@@ -24,11 +24,19 @@ Kurtosis<IT, OT>::Kurtosis(const Config& config,
             // Kernel function key.
             "compute_sk_array",
             // Kernel grid & block size.
+            /*
             PadGridSize(
-                getInputBuffer().size(), 
+                getInputBuffer().size(),
                 config.blockSize
             ),
-            config.blockSize,
+            */
+            dim3( // grid dimensions (?)
+                config.blockSize
+            ),
+            dim3( // threads per block
+                28,
+                2
+            ),
             // Kernel templates.
             TypeInfo<IT>::name,
             TypeInfo<OT>::name

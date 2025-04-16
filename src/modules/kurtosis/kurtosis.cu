@@ -35,69 +35,91 @@ __global__ void compute_sk_array(
     cuFloatComplex* block,
     int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
 
-
-    // Compute indices
-    int ant = blockIdx.x;    // Antenna index
-    int chan = blockIdx.y;   // Channel index
-    int pol = threadIdx.x;   // Polarization index
-
     float sklim_lower, sklim_upper;
     // let's assume STDDEV of 5 for now
-    if (N_SAMPS == 256) {
-        sklim_lower = 0.526881;
-        sklim_upper = 2.18694;
+
+    int block_size = 256;
+
+    switch (block_size) {
+        case 256:
+            sklim_lower = 0.526881;
+            sklim_upper = 2.18694;
+            break;
+        case 512:
+            sklim_lower = 0.649093;
+            sklim_upper = 1.69044;
+            break;
+        case 1024:
+            sklim_lower = 0.740405;
+            sklim_upper = 1.42332;
+            break;
+        case 2048:
+            sklim_lower = 0.808641;
+            sklim_upper = 1.27145;
+            break;
+        case 8192:
+            sklim_lower = 0.898022;
+            sklim_upper = 1.12164;
+        default:
+            break;
     }
-    if (N_SAMPS == 512) {
-        sklim_lower = 0.649093;
-        sklim_upper = 1.69044;
-    }
-    if (N_SAMPS == 1024) {
-        sklim_lower = 0.740405;
-        sklim_upper = 1.42332;
-    }
 
-    // printf("%.5f, %.5f, %d, %d %d %d\n", sklim_lower, sklim_upper, N_SAMPS, ant, chan, pol);
+    // Compute indices
+    int ant = threadIdx.x;    // Antenna index
+    int chan = blockIdx.x; // blockIdx.y;   // Channel index
+    int pol = threadIdx.y;   // Polarization index
 
-    if (ant < N_ANTS && chan < N_CHANS && pol < N_POLS) {
-        // Initialize sums
-        float s1 = 0.0f;
-        float s2 = 0.0f;
+    //printf("%d %d %d %.5f %.5f\n", ant, chan, N_SAMPS, sklim_upper, sklim_lower);
+
+    float s1, s2, v2, sk, x, y;
+    float nsamps_lo = block_size - 1.0f;
+    float nsamps_hi = block_size + 1.0f;
+    float quotient = ((nsamps_hi) / (nsamps_lo));
 
 
-        // printf("here 1 %d %d %d\n", ant, chan, pol);
-        // Compute s1 (sum of elements) and s2 (sum of squares)
-        for (int samp = 0; samp < N_SAMPS; samp++) {
-            int idx = ((ant * N_CHANS + chan) * N_SAMPS + samp) * N_POLS + pol;
-            cuFloatComplex value = block[idx];
+    for (int samp_start = 0; samp_start < N_SAMPS; samp_start = samp_start + block_size) {
+    // for (int pol = 0; pol < N_POLS; pol++) {
+        if (ant < N_ANTS && chan < N_CHANS) {
+            //printf("%d %d %d %d : %d %d %d\n", N_ANTS, N_CHANS, N_SAMPS, N_POLS, ant, chan, pol);
 
-            float v2 = value.x * value.x + value.y * value.y;
+            // zero-out sums
+            s1 = 0.0f;
+            s2 = 0.0f;
 
-            s1 += v2;
-            s2 += v2 * v2;
-        }
 
-        //printf("here 2 %d %d %d\n", ant, chan, pol);
+            // printf("here 1 %d %d %d\n", ant, chan, pol);
+            // Compute s1 (sum of elements) and s2 (sum of squares)
+            int baseidx = (ant * N_CHANS + chan) * N_SAMPS + samp_start;
+            for (int samp = 0; samp < block_size; samp++) {
+                int idx = (baseidx + samp) * N_POLS + pol;
+                cuFloatComplex value = block[idx];
+                x = value.x;
+                y = value.y;
+                // printf("\t\t%.5f %.5f\n", x, y);
+                //v2 = value.x * value.x + value.y * value.y;
+                v2 = x * x + y * y;
+                s1 += v2;
+                s2 += v2 * v2;
+            }
 
-        // Compute sk value
-        float sk = ((N_SAMPS + 1.0f) / (N_SAMPS - 1.0f)) * ((N_SAMPS * (s2 / (s1 * s1))) - 1.0f);
-        
-        // based on sk we can zap the channel
-        
-        if (sk > sklim_upper || sk < sklim_lower) {
+            //printf("\ts1 s2 quotient bsize : %.5f %.5f %.5f %d\n", s1, s2, quotient, block_size);
+            // Compute sk value
+            sk = quotient * ((block_size * (s2 / (s1 * s1))) - 1.0f);
             
-            int chan_start = ((ant * N_CHANS + chan) * N_SAMPS + 0) * N_POLS + pol;
-            for (int j = chan_start; j < chan_start + N_SAMPS * N_POLS; j = j + N_POLS) {
-                // printf("here 2.1 %d %d %d (%d)\n", ant, chan, pol, chan_start);
-                // printf("here 2.1\n");
-                block[j].x = 0.0;
-                block[j].y = 0.0;
-                //printf("here 2.2 %d %d %d (%d)\n", ant, chan, pol, chan_start);
+            // based on sk we can zap the channel
+            //printf("\tsk: %.5f\texp %.5f - %.5f\n", sk, sklim_lower, sklim_upper); 
+            //if (1 == 1) {
+            if (sk > sklim_upper || sk < sklim_lower) {
+                //printf("%d %d %d zapped\n", ant, chan, pol);
+                //int chan_start = ((ant * N_CHANS + chan) * N_SAMPS + 0) * N_POLS + pol;
+                int chan_start = baseidx * N_POLS + pol;
+                for (int j = chan_start; j < chan_start + block_size * N_POLS; j = j + N_POLS) {
+                    // memset(block[j]...(
+                    block[j].x = 0.0;
+                    block[j].y = 0.0;
+                }
             }
         }
-
-        // Write the result to the output array
-        // int out_idx = ((ant * N_CHANS + chan) * 1 + 0) * N_POLS + pol;
-        // output[out_idx] = sk;
     }
 }
 
