@@ -1,9 +1,9 @@
-#ifndef BENCHMARKS_BUNDLES_ATA_MODE_BH_H
-#define BENCHMARKS_BUNDLES_ATA_MODE_BH_H
+#ifndef BENCHMARKS_BUNDLES_ATA_MODEBH_H
+#define BENCHMARKS_BUNDLES_ATA_MODEBH_H
 
 #include "blade/base.hh"
 #include "blade/memory/custom.hh"
-#include "blade/modules/stacker.hh"
+#include "blade/modules/gather.hh"
 #include "blade/bundles/ata/mode_b.hh"
 #include "blade/bundles/generic/mode_h.hh"
 
@@ -34,7 +34,7 @@ class Benchmark : public Runner {
 
         BOOL beamformerIncoherentBeam = false;
 
-        U64 detectorIntegrationRate;
+        U64 detectorIntegrationSize;
         U64 detectorNumberOfOutputPolarizations;
     };
 
@@ -44,28 +44,28 @@ class Benchmark : public Runner {
            inputBuffer(config.inputShape),
            outputBuffer(config.outputShape) {
 
-        ArrayShape stackerInputShape = config.inputShape;
+        ArrayShape gatherInputShape = config.inputShape;
         // Replace the number of antennas with the number of beams.
-        stackerInputShape[0] = config.phasorBeamCoordinates.size();
+        gatherInputShape[0] = config.phasorBeamCoordinates.size();
         // Add one for the incoherent beam.
         if (config.beamformerIncoherentBeam) {
-            stackerInputShape[0] = stackerInputShape.numberOfAspects() + 1;
+            gatherInputShape[0] = gatherInputShape.numberOfAspects() + 1;
         }
 
-        ArrayShape stackerOutputShape = stackerInputShape;
+        ArrayShape gatherOutputShape = gatherInputShape;
         // Output should be the number of frequency channels of the output.
-        stackerOutputShape[2] = config.outputShape[1] / config.inputShape[1];
+        gatherOutputShape[2] = config.outputShape[1] / config.inputShape[1];
 
-        U64 stackerMultiplier = stackerOutputShape[2] / stackerInputShape[2];
+        U64 gatherMultiplier = gatherOutputShape[2] / gatherInputShape[2];
 
-        BL_DEBUG("Stacker input shape: {}", stackerInputShape);
-        BL_DEBUG("Stacker output shape: {}", stackerOutputShape);
-        BL_DEBUG("Stacker multiplier: {}", stackerMultiplier);
-
+        BL_DEBUG("Gather input shape: {}", gatherInputShape);
+        BL_DEBUG("Gather output shape: {}", gatherOutputShape);
+        BL_DEBUG("Gather multiplier: {}", gatherMultiplier);
+        
         BL_DEBUG("Initializing Mode-B Bundle.");
         this->connect(modeB, {
             .inputShape = config.inputShape,
-            .outputShape = stackerInputShape,
+            .outputShape = gatherInputShape,
 
             .preBeamformerChannelizerRate = 1,
 
@@ -89,25 +89,25 @@ class Benchmark : public Runner {
             .buffer = inputBuffer,
         });
 
-        BL_DEBUG("Instantiating stacker.");
-        this->connect(stacker, {
+        BL_DEBUG("Instantiating gather.");
+        this->connect(gather, {
             .axis = 2,
-            .multiplier = stackerMultiplier,
+            .multiplier = gatherMultiplier, 
         }, {
             .buf = modeB->getOutputBuffer(),
         });
 
         BL_DEBUG("Initializing Mode-H Bundle.");
         this->connect(modeH, {
-            .inputShape = stackerOutputShape,
+            .inputShape = gatherOutputShape,
             .outputShape = config.outputShape,
 
             .polarizerConvertToCircular = false,
 
-            .detectorIntegrationRate = 1,
+            .detectorIntegrationSize = 1,
             .detectorNumberOfOutputPolarizations = config.detectorNumberOfOutputPolarizations,
         }, {
-            .buffer = stacker->getOutputBuffer(),
+            .buffer = gather->getOutputBuffer(),
         });
     }
 
@@ -120,13 +120,8 @@ class Benchmark : public Runner {
         return Result::SUCCESS;
     }
 
-    Result transferResult() {
-        BL_CHECK(this->copy(outputBuffer, modeH->getOutputBuffer()));
-        return Result::SUCCESS;
-    }
-
     Result transferOut(ArrayTensor<Device::CPU, OT>& cpuOutputBuffer) {
-
+        BL_CHECK(this->copy(outputBuffer, modeH->getOutputBuffer()));
         BL_CHECK(this->copy(cpuOutputBuffer, outputBuffer));
         return Result::SUCCESS;
     }
@@ -134,7 +129,7 @@ class Benchmark : public Runner {
  private:
     std::shared_ptr<ModeB> modeB;
     std::shared_ptr<ModeH> modeH;
-    std::shared_ptr<Modules::Stacker<CF32, CF32>> stacker;
+    std::shared_ptr<Modules::Gather<CF32, CF32>> gather;
 
     Duet<Tensor<Device::CPU, F64>> inputDut;
     Duet<Tensor<Device::CPU, F64>> inputJulianDate;
@@ -149,7 +144,7 @@ class BenchmarkRunner {
         BL_DEBUG("Configuring Pipeline.");
         config = {
             .inputShape = ArrayShape({ 20, 192, 8192, 2 }),
-            .outputShape = ArrayShape({ 2+1, 192*8192*32, 1, 1 }),
+            .outputShape = ArrayShape({ 2+1, 192*8192*8, 1, 1 }),
 
             .preBeamformerPolarizerConvertToCircular = false,
 
@@ -197,7 +192,7 @@ class BenchmarkRunner {
 
             .beamformerIncoherentBeam = true,
 
-            .detectorIntegrationRate = 4,
+            .detectorIntegrationSize = 4,
             .detectorNumberOfOutputPolarizations = 1,
         };
         pipeline = std::make_shared<Benchmark<IT, OT>>(config);
@@ -220,16 +215,13 @@ class BenchmarkRunner {
                 const U64 i = enqueueCount++ % 2;
                 return pipeline->transferIn(inputDut1[i], inputJulianDate[i], inputBuffer[i]);
             };
-            auto resultCallback = [&](){
-                return pipeline->transferResult();
-            };
             auto outputCallback = [&](){
                 const U64 i = dequeueCount++ % 2;
                 return pipeline->transferOut(outputBuffer[i]);
             };
-            BL_CHECK(pipeline->enqueue(inputCallback, resultCallback, outputCallback, enqueueCount, dequeueCount));
+            BL_CHECK(pipeline->enqueue(inputCallback, outputCallback, enqueueCount, dequeueCount));
 
-            BL_CHECK(pipeline->dequeue([&](const U64& inputId,
+            BL_CHECK(pipeline->dequeue([&](const U64& inputId, 
                                            const U64& outputId,
                                            const bool& didOutput){
                 if (didOutput) {

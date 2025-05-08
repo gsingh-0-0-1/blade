@@ -7,8 +7,4 @@
 #include "blade/bundles/generic/mode_h.hh"
 #endif
 
-#ifdef BLADE_BUNDLE_GENERIC_MODE_X
-#include "blade/bundles/generic/mode_x.hh"
-#endif
-
 #endif

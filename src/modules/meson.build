@@ -1,17 +1,15 @@
 sum_lst = {}
 
-subdir('caster')
+subdir('cast')
 subdir('phasor')
 subdir('detector')
-subdir('correlator')
 subdir('beamformer')
 subdir('channelizer')
 subdir('polarizer')
-subdir('stacker')
-subdir('permutator')
-subdir('duplicator')
+subdir('gather')
+subdir('permutation')
+subdir('duplicate')
 subdir('guppi')
-subdir('integrator')
 subdir('bfr5')
 subdir('kurtosis')
 

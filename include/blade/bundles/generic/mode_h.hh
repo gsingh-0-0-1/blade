@@ -5,8 +5,7 @@
 
 #include "blade/modules/channelizer/base.hh"
 #include "blade/modules/detector.hh"
-#include "blade/modules/caster.hh"
-#include "blade/modules/integrator.hh"
+#include "blade/modules/cast.hh"
 #include "blade/modules/polarizer.hh"
 
 namespace Blade::Bundles::Generic {
@@ -22,10 +21,10 @@ class BLADE_API ModeH : public Bundle {
 
         BOOL polarizerConvertToCircular = false;
 
-        U64 detectorIntegrationRate;
+        U64 detectorIntegrationSize;
         U64 detectorNumberOfOutputPolarizations;
 
-        U64 casterBlockSize = 512;
+        U64 castBlockSize = 512;
         U64 polarizerBlockSize = 512;
         U64 channelizerBlockSize = 512;
         U64 detectorBlockSize = 512;
@@ -48,7 +47,7 @@ class BLADE_API ModeH : public Bundle {
     // Output
 
     constexpr const ArrayTensor<Device::CUDA, OT>& getOutputBuffer() {
-        return outputCaster->getOutputBuffer();
+        return outputCast->getOutputBuffer();
     }
 
     // Constructor
@@ -57,9 +56,9 @@ class BLADE_API ModeH : public Bundle {
          : Bundle(stream), config(config), input(input) {
         BL_DEBUG("Initializing Mode-H Bundle.");
 
-        BL_DEBUG("Instantiating input caster from {} to CF32.", TypeInfo<IT>::name);
-        this->connect(inputCaster, {
-            .blockSize = config.casterBlockSize,
+        BL_DEBUG("Instantiating input cast from {} to CF32.", TypeInfo<IT>::name);
+        this->connect(inputCast, {
+            .blockSize = config.castBlockSize,
         }, {
             .buf = input.buffer,
         });
@@ -70,7 +69,7 @@ class BLADE_API ModeH : public Bundle {
 
             .blockSize = config.channelizerBlockSize,
         }, {
-            .buf = inputCaster->getOutputBuffer(),
+            .buf = inputCast->getOutputBuffer(),
         });
 
         BL_DEBUG("Instatiating polarizer module.")
@@ -84,7 +83,7 @@ class BLADE_API ModeH : public Bundle {
 
         BL_DEBUG("Instantiating detector module.");
         this->connect(detector, {
-            .integrationRate = 1,
+            .integrationSize = config.detectorIntegrationSize,
             .numberOfOutputPolarizations = config.detectorNumberOfOutputPolarizations,
 
             .blockSize = config.detectorBlockSize,
@@ -92,20 +91,11 @@ class BLADE_API ModeH : public Bundle {
             .buf = polarizer->getOutputBuffer(),
         });
 
-        
-        BL_DEBUG("Instatiating integrator module.")
-        this->connect(integrator, {
-            .size = 1,
-            .rate = config.detectorIntegrationRate,
+        BL_DEBUG("Instantiating output cast from F32 to {}.", TypeInfo<OT>::name);
+        this->connect(outputCast, {
+            .blockSize = config.castBlockSize,
         }, {
             .buf = detector->getOutputBuffer(),
-        });
-
-        BL_DEBUG("Instantiating output caster from F32 to {}.", TypeInfo<OT>::name);
-        this->connect(outputCaster, {
-            .blockSize = config.casterBlockSize,
-        }, {
-            .buf = integrator->getOutputBuffer(),
         });
 
         if (getOutputBuffer().shape() != config.outputShape) {
@@ -119,8 +109,8 @@ class BLADE_API ModeH : public Bundle {
     const Config config;
     Input input;
 
-    using InputCaster = typename Modules::Caster<IT, CF32>;
-    std::shared_ptr<InputCaster> inputCaster;
+    using InputCast = typename Modules::Cast<IT, CF32>;
+    std::shared_ptr<InputCast> inputCast;
 
     using Channelizer = typename Modules::Channelizer<CF32, CF32>;
     std::shared_ptr<Channelizer> channelizer;
@@ -131,11 +121,8 @@ class BLADE_API ModeH : public Bundle {
     using Detector = typename Modules::Detector<CF32, F32>;
     std::shared_ptr<Detector> detector;
 
-    using Integrator = typename Modules::Integrator<F32, F32>;
-    std::shared_ptr<Integrator> integrator;
-
-    using OutputCaster = typename Modules::Caster<F32, OT>;
-    std::shared_ptr<OutputCaster> outputCaster;
+    using OutputCast = typename Modules::Cast<F32, OT>;
+    std::shared_ptr<OutputCast> outputCast;
 };
 
 }  // namespace Blade::Bundles::Generic

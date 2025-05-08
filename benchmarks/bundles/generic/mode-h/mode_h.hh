@@ -1,5 +1,5 @@
-#ifndef BENCHMARKS_BUNDLES_GENERIC_MODE_H_H
-#define BENCHMARKS_BUNDLES_GENERIC_MODE_H_H
+#ifndef BENCHMARKS_BUNDLES_GENERIC_MODEH_H
+#define BENCHMARKS_BUNDLES_GENERIC_MODEH_H
 
 #include "blade/base.hh"
 #include "blade/bundles/generic/mode_h.hh"
@@ -26,12 +26,8 @@ class Benchmark : public Runner {
         return Result::SUCCESS;
     }
 
-    Result transferResult() {
-        BL_CHECK(this->copy(outputBuffer, modeH->getOutputBuffer()));
-        return Result::SUCCESS;
-    }
-
     Result transferOut(ArrayTensor<Device::CPU, OT>& cpuOutputBuffer) {
+        BL_CHECK(this->copy(outputBuffer, modeH->getOutputBuffer()));
         BL_CHECK(this->copy(cpuOutputBuffer, outputBuffer));
         return Result::SUCCESS;
     }
@@ -54,7 +50,7 @@ class BenchmarkRunner {
 
             .polarizerConvertToCircular = true,
 
-            .detectorIntegrationRate = 1,
+            .detectorIntegrationSize = 1,
             .detectorNumberOfOutputPolarizations = 1,
         };
         pipeline = std::make_shared<Benchmark<IT, OT>>(config);
@@ -75,16 +71,13 @@ class BenchmarkRunner {
                 const U64 i = enqueueCount++ % 2;
                 return pipeline->transferIn(inputBuffer[i]);
             };
-            auto resultCallback = [&](){
-                return pipeline->transferResult();
-            };
             auto outputCallback = [&](){
                 const U64 i = dequeueCount++ % 2;
                 return pipeline->transferOut(outputBuffer[i]);
             };
-            BL_CHECK(pipeline->enqueue(inputCallback, resultCallback, outputCallback, enqueueCount, dequeueCount));
+            BL_CHECK(pipeline->enqueue(inputCallback, outputCallback, enqueueCount, dequeueCount));
 
-            BL_CHECK(pipeline->dequeue([&](const U64& inputId,
+            BL_CHECK(pipeline->dequeue([&](const U64& inputId, 
                                            const U64& outputId,
                                            const bool& didOutput){
                 if (didOutput) {

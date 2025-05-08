@@ -1,7 +1,7 @@
 project(
     'blade',
     ['cpp', 'c', 'cuda'],
-    version: '1.1.0', # [VERSION UPGRADE HOOK]
+    version: '1.0.5',
     default_options: [
         'buildtype=release',
         'cpp_std=c++20',

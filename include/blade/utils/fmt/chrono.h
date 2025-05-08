@@ -5,62 +5,60 @@
 //
 // For the license information refer to format.h.
 
-#ifndef BL_FMT_CHRONO_H_
-#define BL_FMT_CHRONO_H_
+#ifndef FMT_CHRONO_H_
+#define FMT_CHRONO_H_
 
-#ifndef BL_FMT_MODULE
-#  include <algorithm>
-#  include <chrono>
-#  include <cmath>    // std::isfinite
-#  include <cstring>  // std::memcpy
-#  include <ctime>
-#  include <iterator>
-#  include <locale>
-#  include <ostream>
-#  include <type_traits>
-#endif
+#include <algorithm>
+#include <chrono>
+#include <cmath>    // std::isfinite
+#include <cstring>  // std::memcpy
+#include <ctime>
+#include <iterator>
+#include <locale>
+#include <ostream>
+#include <type_traits>
 
-#include "format.h"
+#include "ostream.h"  // formatbuf
 
-BL_FMT_BEGIN_NAMESPACE
+FMT_BEGIN_NAMESPACE
 
 // Check if std::chrono::local_t is available.
-#ifndef BL_FMT_USE_LOCAL_TIME
+#ifndef FMT_USE_LOCAL_TIME
 #  ifdef __cpp_lib_chrono
-#    define BL_FMT_USE_LOCAL_TIME (__cpp_lib_chrono >= 201907L)
+#    define FMT_USE_LOCAL_TIME (__cpp_lib_chrono >= 201907L)
 #  else
-#    define BL_FMT_USE_LOCAL_TIME 0
+#    define FMT_USE_LOCAL_TIME 0
 #  endif
 #endif
 
 // Check if std::chrono::utc_timestamp is available.
-#ifndef BL_FMT_USE_UTC_TIME
+#ifndef FMT_USE_UTC_TIME
 #  ifdef __cpp_lib_chrono
-#    define BL_FMT_USE_UTC_TIME (__cpp_lib_chrono >= 201907L)
+#    define FMT_USE_UTC_TIME (__cpp_lib_chrono >= 201907L)
 #  else
-#    define BL_FMT_USE_UTC_TIME 0
+#    define FMT_USE_UTC_TIME 0
 #  endif
 #endif
 
 // Enable tzset.
-#ifndef BL_FMT_USE_TZSET
+#ifndef FMT_USE_TZSET
 // UWP doesn't provide _tzset.
-#  if BL_FMT_HAS_INCLUDE("winapifamily.h")
+#  if FMT_HAS_INCLUDE("winapifamily.h")
 #    include <winapifamily.h>
 #  endif
 #  if defined(_WIN32) && (!defined(WINAPI_FAMILY) || \
                           (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP))
-#    define BL_FMT_USE_TZSET 1
+#    define FMT_USE_TZSET 1
 #  else
-#    define BL_FMT_USE_TZSET 0
+#    define FMT_USE_TZSET 0
 #  endif
 #endif
 
 // Enable safe chrono durations, unless explicitly disabled.
-#ifndef BL_FMT_SAFE_DURATION_CAST
-#  define BL_FMT_SAFE_DURATION_CAST 1
+#ifndef FMT_SAFE_DURATION_CAST
+#  define FMT_SAFE_DURATION_CAST 1
 #endif
-#if BL_FMT_SAFE_DURATION_CAST
+#if FMT_SAFE_DURATION_CAST
 
 // For conversion between std::chrono::durations without undefined
 // behaviour or erroneous results.
@@ -71,10 +69,10 @@ BL_FMT_BEGIN_NAMESPACE
 namespace safe_duration_cast {
 
 template <typename To, typename From,
-          BL_FMT_ENABLE_IF(!std::is_same<From, To>::value &&
+          FMT_ENABLE_IF(!std::is_same<From, To>::value &&
                         std::numeric_limits<From>::is_signed ==
                             std::numeric_limits<To>::is_signed)>
-BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
+FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
     -> To {
   ec = 0;
   using F = std::numeric_limits<From>;
@@ -96,13 +94,15 @@ BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
   return static_cast<To>(from);
 }
 
-/// Converts From to To, without loss. If the dynamic value of from
-/// can't be converted to To without loss, ec is set.
+/**
+ * converts From to To, without loss. If the dynamic value of from
+ * can't be converted to To without loss, ec is set.
+ */
 template <typename To, typename From,
-          BL_FMT_ENABLE_IF(!std::is_same<From, To>::value &&
+          FMT_ENABLE_IF(!std::is_same<From, To>::value &&
                         std::numeric_limits<From>::is_signed !=
                             std::numeric_limits<To>::is_signed)>
-BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
+FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
     -> To {
   ec = 0;
   using F = std::numeric_limits<From>;
@@ -112,7 +112,7 @@ BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
 
   if (detail::const_check(F::is_signed && !T::is_signed)) {
     // From may be negative, not allowed!
-    if (bl::fmt::detail::is_negative(from)) {
+    if (fmt::detail::is_negative(from)) {
       ec = 1;
       return {};
     }
@@ -134,8 +134,8 @@ BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
 }
 
 template <typename To, typename From,
-          BL_FMT_ENABLE_IF(std::is_same<From, To>::value)>
-BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
+          FMT_ENABLE_IF(std::is_same<From, To>::value)>
+FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
     -> To {
   ec = 0;
   return from;
@@ -156,8 +156,8 @@ BL_FMT_CONSTEXPR auto lossless_integral_conversion(const From from, int& ec)
  */
 // clang-format on
 template <typename To, typename From,
-          BL_FMT_ENABLE_IF(!std::is_same<From, To>::value)>
-BL_FMT_CONSTEXPR auto safe_float_conversion(const From from, int& ec) -> To {
+          FMT_ENABLE_IF(!std::is_same<From, To>::value)>
+FMT_CONSTEXPR auto safe_float_conversion(const From from, int& ec) -> To {
   ec = 0;
   using T = std::numeric_limits<To>;
   static_assert(std::is_floating_point<From>::value, "From must be floating");
@@ -178,17 +178,19 @@ BL_FMT_CONSTEXPR auto safe_float_conversion(const From from, int& ec) -> To {
 }  // function
 
 template <typename To, typename From,
-          BL_FMT_ENABLE_IF(std::is_same<From, To>::value)>
-BL_FMT_CONSTEXPR auto safe_float_conversion(const From from, int& ec) -> To {
+          FMT_ENABLE_IF(std::is_same<From, To>::value)>
+FMT_CONSTEXPR auto safe_float_conversion(const From from, int& ec) -> To {
   ec = 0;
   static_assert(std::is_floating_point<From>::value, "From must be floating");
   return from;
 }
 
-/// Safe duration cast between integral durations
+/**
+ * safe duration cast between integral durations
+ */
 template <typename To, typename FromRep, typename FromPeriod,
-          BL_FMT_ENABLE_IF(std::is_integral<FromRep>::value),
-          BL_FMT_ENABLE_IF(std::is_integral<typename To::rep>::value)>
+          FMT_ENABLE_IF(std::is_integral<FromRep>::value),
+          FMT_ENABLE_IF(std::is_integral<typename To::rep>::value)>
 auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
                         int& ec) -> To {
   using From = std::chrono::duration<FromRep, FromPeriod>;
@@ -235,10 +237,12 @@ auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
   return ec ? To() : To(tocount);
 }
 
-/// Safe duration_cast between floating point durations
+/**
+ * safe duration_cast between floating point durations
+ */
 template <typename To, typename FromRep, typename FromPeriod,
-          BL_FMT_ENABLE_IF(std::is_floating_point<FromRep>::value),
-          BL_FMT_ENABLE_IF(std::is_floating_point<typename To::rep>::value)>
+          FMT_ENABLE_IF(std::is_floating_point<FromRep>::value),
+          FMT_ENABLE_IF(std::is_floating_point<typename To::rep>::value)>
 auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
                         int& ec) -> To {
   using From = std::chrono::duration<FromRep, FromPeriod>;
@@ -315,48 +319,15 @@ auto safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
 #endif
 
 // Prevents expansion of a preceding token as a function-style macro.
-// Usage: f BL_FMT_NOMACRO()
-#define BL_FMT_NOMACRO
+// Usage: f FMT_NOMACRO()
+#define FMT_NOMACRO
 
 namespace detail {
 template <typename T = void> struct null {};
-inline auto localtime_r BL_FMT_NOMACRO(...) -> null<> { return null<>(); }
+inline auto localtime_r FMT_NOMACRO(...) -> null<> { return null<>(); }
 inline auto localtime_s(...) -> null<> { return null<>(); }
 inline auto gmtime_r(...) -> null<> { return null<>(); }
 inline auto gmtime_s(...) -> null<> { return null<>(); }
-
-// It is defined here and not in ostream.h because the latter has expensive
-// includes.
-template <typename Streambuf> class formatbuf : public Streambuf {
- private:
-  using char_type = typename Streambuf::char_type;
-  using streamsize = decltype(std::declval<Streambuf>().sputn(nullptr, 0));
-  using int_type = typename Streambuf::int_type;
-  using traits_type = typename Streambuf::traits_type;
-
-  buffer<char_type>& buffer_;
-
- public:
-  explicit formatbuf(buffer<char_type>& buf) : buffer_(buf) {}
-
- protected:
-  // The put area is always empty. This makes the implementation simpler and has
-  // the advantage that the streambuf and the buffer are always in sync and
-  // sputc never writes into uninitialized memory. A disadvantage is that each
-  // call to sputc always results in a (virtual) call to overflow. There is no
-  // disadvantage here for sputn since this always results in a call to xsputn.
-
-  auto overflow(int_type ch) -> int_type override {
-    if (!traits_type::eq_int_type(ch, traits_type::eof()))
-      buffer_.push_back(static_cast<char_type>(ch));
-    return ch;
-  }
-
-  auto xsputn(const char_type* s, streamsize count) -> streamsize override {
-    buffer_.append(s, s + count);
-    return count;
-  }
-};
 
 inline auto get_classic_locale() -> const std::locale& {
   static const auto& locale = std::locale::classic();
@@ -372,7 +343,7 @@ template <typename CodeUnit> struct codecvt_result {
 template <typename CodeUnit>
 void write_codecvt(codecvt_result<CodeUnit>& out, string_view in_buf,
                    const std::locale& loc) {
-#if BL_FMT_CLANG_VERSION
+#if FMT_CLANG_VERSION
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wdeprecated"
   auto& f = std::use_facet<std::codecvt<CodeUnit, char, std::mbstate_t>>(loc);
@@ -385,18 +356,17 @@ void write_codecvt(codecvt_result<CodeUnit>& out, string_view in_buf,
   auto result = f.in(mb, in_buf.begin(), in_buf.end(), from_next,
                      std::begin(out.buf), std::end(out.buf), out.end);
   if (result != std::codecvt_base::ok)
-    BL_FMT_THROW(format_error("failed to format time"));
+    FMT_THROW(format_error("failed to format time"));
 }
 
 template <typename OutputIt>
 auto write_encoded_tm_str(OutputIt out, string_view in, const std::locale& loc)
     -> OutputIt {
-  if (detail::use_utf8() && loc != get_classic_locale()) {
+  if (detail::is_utf8() && loc != get_classic_locale()) {
     // char16_t and char32_t codecvts are broken in MSVC (linkage errors) and
     // gcc-4.
-#if BL_FMT_MSC_VERSION != 0 ||  \
-    (defined(__GLIBCXX__) && \
-     (!defined(_GLIBCXX_USE_DUAL_ABI) || _GLIBCXX_USE_DUAL_ABI == 0))
+#if FMT_MSC_VERSION != 0 || \
+    (defined(__GLIBCXX__) && !defined(_GLIBCXX_USE_DUAL_ABI))
     // The _GLIBCXX_USE_DUAL_ABI macro is always defined in libstdc++ from gcc-5
     // and newer.
     using code_unit = wchar_t;
@@ -411,23 +381,23 @@ auto write_encoded_tm_str(OutputIt out, string_view in, const std::locale& loc)
     auto u =
         to_utf8<code_unit, basic_memory_buffer<char, unit_t::max_size * 4>>();
     if (!u.convert({unit.buf, to_unsigned(unit.end - unit.buf)}))
-      BL_FMT_THROW(format_error("failed to format time"));
-    return copy<char>(u.c_str(), u.c_str() + u.size(), out);
+      FMT_THROW(format_error("failed to format time"));
+    return copy_str<char>(u.c_str(), u.c_str() + u.size(), out);
   }
-  return copy<char>(in.data(), in.data() + in.size(), out);
+  return copy_str<char>(in.data(), in.data() + in.size(), out);
 }
 
 template <typename Char, typename OutputIt,
-          BL_FMT_ENABLE_IF(!std::is_same<Char, char>::value)>
+          FMT_ENABLE_IF(!std::is_same<Char, char>::value)>
 auto write_tm_str(OutputIt out, string_view sv, const std::locale& loc)
     -> OutputIt {
   codecvt_result<Char> unit;
   write_codecvt(unit, sv, loc);
-  return copy<Char>(unit.buf, unit.end, out);
+  return copy_str<Char>(unit.buf, unit.end, out);
 }
 
 template <typename Char, typename OutputIt,
-          BL_FMT_ENABLE_IF(std::is_same<Char, char>::value)>
+          FMT_ENABLE_IF(std::is_same<Char, char>::value)>
 auto write_tm_str(OutputIt out, string_view sv, const std::locale& loc)
     -> OutputIt {
   return write_encoded_tm_str(out, sv, loc);
@@ -441,11 +411,11 @@ inline void do_write(buffer<Char>& buf, const std::tm& time,
   os.imbue(loc);
   const auto& facet = std::use_facet<std::time_put<Char>>(loc);
   auto end = facet.put(os, os, Char(' '), &time, format, modifier);
-  if (end.failed()) BL_FMT_THROW(format_error("failed to format time"));
+  if (end.failed()) FMT_THROW(format_error("failed to format time"));
 }
 
 template <typename Char, typename OutputIt,
-          BL_FMT_ENABLE_IF(!std::is_same<Char, char>::value)>
+          FMT_ENABLE_IF(!std::is_same<Char, char>::value)>
 auto write(OutputIt out, const std::tm& time, const std::locale& loc,
            char format, char modifier = 0) -> OutputIt {
   auto&& buf = get_buffer<Char>(out);
@@ -454,7 +424,7 @@ auto write(OutputIt out, const std::tm& time, const std::locale& loc,
 }
 
 template <typename Char, typename OutputIt,
-          BL_FMT_ENABLE_IF(std::is_same<Char, char>::value)>
+          FMT_ENABLE_IF(std::is_same<Char, char>::value)>
 auto write(OutputIt out, const std::tm& time, const std::locale& loc,
            char format, char modifier = 0) -> OutputIt {
   auto&& buf = basic_memory_buffer<Char>();
@@ -473,14 +443,14 @@ struct is_same_arithmetic_type
 
 template <
     typename To, typename FromRep, typename FromPeriod,
-    BL_FMT_ENABLE_IF(is_same_arithmetic_type<FromRep, typename To::rep>::value)>
+    FMT_ENABLE_IF(is_same_arithmetic_type<FromRep, typename To::rep>::value)>
 auto fmt_duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
-#if BL_FMT_SAFE_DURATION_CAST
+#if FMT_SAFE_DURATION_CAST
   // Throwing version of safe_duration_cast is only available for
   // integer to integer or float to float casts.
   int ec;
   To to = safe_duration_cast::safe_duration_cast<To>(from, ec);
-  if (ec) BL_FMT_THROW(format_error("cannot format duration"));
+  if (ec) FMT_THROW(format_error("cannot format duration"));
   return to;
 #else
   // Standard duration cast, may overflow.
@@ -490,7 +460,7 @@ auto fmt_duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
 
 template <
     typename To, typename FromRep, typename FromPeriod,
-    BL_FMT_ENABLE_IF(!is_same_arithmetic_type<FromRep, typename To::rep>::value)>
+    FMT_ENABLE_IF(!is_same_arithmetic_type<FromRep, typename To::rep>::value)>
 auto fmt_duration_cast(std::chrono::duration<FromRep, FromPeriod> from) -> To {
   // Mixed integer <-> float cast is not supported by safe_duration_cast.
   return std::chrono::duration_cast<To>(from);
@@ -509,12 +479,12 @@ auto to_time_t(
 }
 }  // namespace detail
 
-BL_FMT_BEGIN_EXPORT
+FMT_BEGIN_EXPORT
 
 /**
- * Converts given time since epoch as `std::time_t` value into calendar time,
- * expressed in local time. Unlike `std::localtime`, this function is
- * thread-safe on most platforms.
+  Converts given time since epoch as ``std::time_t`` value into calendar time,
+  expressed in local time. Unlike ``std::localtime``, this function is
+  thread-safe on most platforms.
  */
 inline auto localtime(std::time_t time) -> std::tm {
   struct dispatcher {
@@ -524,22 +494,22 @@ inline auto localtime(std::time_t time) -> std::tm {
     dispatcher(std::time_t t) : time_(t) {}
 
     auto run() -> bool {
-      using namespace bl::fmt::detail;
+      using namespace fmt::detail;
       return handle(localtime_r(&time_, &tm_));
     }
 
     auto handle(std::tm* tm) -> bool { return tm != nullptr; }
 
     auto handle(detail::null<>) -> bool {
-      using namespace bl::fmt::detail;
+      using namespace fmt::detail;
       return fallback(localtime_s(&tm_, &time_));
     }
 
     auto fallback(int res) -> bool { return res == 0; }
 
-#if !BL_FMT_MSC_VERSION
+#if !FMT_MSC_VERSION
     auto fallback(detail::null<>) -> bool {
-      using namespace bl::fmt::detail;
+      using namespace fmt::detail;
       std::tm* tm = std::localtime(&time_);
       if (tm) tm_ = *tm;
       return tm != nullptr;
@@ -548,11 +518,11 @@ inline auto localtime(std::time_t time) -> std::tm {
   };
   dispatcher lt(time);
   // Too big time values may be unsupported.
-  if (!lt.run()) BL_FMT_THROW(format_error("time_t value out of range"));
+  if (!lt.run()) FMT_THROW(format_error("time_t value out of range"));
   return lt.tm_;
 }
 
-#if BL_FMT_USE_LOCAL_TIME
+#if FMT_USE_LOCAL_TIME
 template <typename Duration>
 inline auto localtime(std::chrono::local_time<Duration> time) -> std::tm {
   return localtime(
@@ -561,9 +531,9 @@ inline auto localtime(std::chrono::local_time<Duration> time) -> std::tm {
 #endif
 
 /**
- * Converts given time since epoch as `std::time_t` value into calendar time,
- * expressed in Coordinated Universal Time (UTC). Unlike `std::gmtime`, this
- * function is thread-safe on most platforms.
+  Converts given time since epoch as ``std::time_t`` value into calendar time,
+  expressed in Coordinated Universal Time (UTC). Unlike ``std::gmtime``, this
+  function is thread-safe on most platforms.
  */
 inline auto gmtime(std::time_t time) -> std::tm {
   struct dispatcher {
@@ -573,20 +543,20 @@ inline auto gmtime(std::time_t time) -> std::tm {
     dispatcher(std::time_t t) : time_(t) {}
 
     auto run() -> bool {
-      using namespace bl::fmt::detail;
+      using namespace fmt::detail;
       return handle(gmtime_r(&time_, &tm_));
     }
 
     auto handle(std::tm* tm) -> bool { return tm != nullptr; }
 
     auto handle(detail::null<>) -> bool {
-      using namespace bl::fmt::detail;
+      using namespace fmt::detail;
       return fallback(gmtime_s(&tm_, &time_));
     }
 
     auto fallback(int res) -> bool { return res == 0; }
 
-#if !BL_FMT_MSC_VERSION
+#if !FMT_MSC_VERSION
     auto fallback(detail::null<>) -> bool {
       std::tm* tm = std::gmtime(&time_);
       if (tm) tm_ = *tm;
@@ -596,7 +566,7 @@ inline auto gmtime(std::time_t time) -> std::tm {
   };
   auto gt = dispatcher(time);
   // Too big time values may be unsupported.
-  if (!gt.run()) BL_FMT_THROW(format_error("time_t value out of range"));
+  if (!gt.run()) FMT_THROW(format_error("time_t value out of range"));
   return gt.tm_;
 }
 
@@ -644,7 +614,7 @@ inline void write_digit2_separated(char* buf, unsigned a, unsigned b,
 }
 
 template <typename Period>
-BL_FMT_CONSTEXPR inline auto get_units() -> const char* {
+FMT_CONSTEXPR inline auto get_units() -> const char* {
   if (std::is_same<Period, std::atto>::value) return "as";
   if (std::is_same<Period, std::femto>::value) return "fs";
   if (std::is_same<Period, std::pico>::value) return "ps";
@@ -676,10 +646,12 @@ enum class numeric_system {
 
 // Glibc extensions for formatting numeric values.
 enum class pad_type {
-  // Pad a numeric result string with zeros (the default).
-  zero,
+  unspecified,
   // Do not pad a numeric result string.
   none,
+  // Pad a numeric result string with zeros even if the conversion specifier
+  // character uses space-padding by default.
+  zero,
   // Pad a numeric result string with spaces.
   space,
 };
@@ -687,7 +659,7 @@ enum class pad_type {
 template <typename OutputIt>
 auto write_padding(OutputIt out, pad_type pad, int width) -> OutputIt {
   if (pad == pad_type::none) return out;
-  return detail::fill_n(out, width, pad == pad_type::space ? ' ' : '0');
+  return std::fill_n(out, width, pad == pad_type::space ? ' ' : '0');
 }
 
 template <typename OutputIt>
@@ -698,13 +670,13 @@ auto write_padding(OutputIt out, pad_type pad) -> OutputIt {
 
 // Parses a put_time-like format string and invokes handler actions.
 template <typename Char, typename Handler>
-BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
+FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
                                        Handler&& handler) -> const Char* {
   if (begin == end || *begin == '}') return begin;
-  if (*begin != '%') BL_FMT_THROW(format_error("invalid format"));
+  if (*begin != '%') FMT_THROW(format_error("invalid format"));
   auto ptr = begin;
+  pad_type pad = pad_type::unspecified;
   while (ptr != end) {
-    pad_type pad = pad_type::zero;
     auto c = *ptr;
     if (c == '}') break;
     if (c != '%') {
@@ -713,7 +685,7 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
     }
     if (begin != ptr) handler.on_text(begin, ptr);
     ++ptr;  // consume '%'
-    if (ptr == end) BL_FMT_THROW(format_error("invalid format"));
+    if (ptr == end) FMT_THROW(format_error("invalid format"));
     c = *ptr;
     switch (c) {
     case '_':
@@ -724,8 +696,12 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
       pad = pad_type::none;
       ++ptr;
       break;
+    case '0':
+      pad = pad_type::zero;
+      ++ptr;
+      break;
     }
-    if (ptr == end) BL_FMT_THROW(format_error("invalid format"));
+    if (ptr == end) FMT_THROW(format_error("invalid format"));
     c = *ptr++;
     switch (c) {
     case '%':
@@ -783,22 +759,22 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
       break;
     // Day of the year/month:
     case 'U':
-      handler.on_dec0_week_of_year(numeric_system::standard, pad);
+      handler.on_dec0_week_of_year(numeric_system::standard);
       break;
     case 'W':
-      handler.on_dec1_week_of_year(numeric_system::standard, pad);
+      handler.on_dec1_week_of_year(numeric_system::standard);
       break;
     case 'V':
-      handler.on_iso_week_of_year(numeric_system::standard, pad);
+      handler.on_iso_week_of_year(numeric_system::standard);
       break;
     case 'j':
       handler.on_day_of_year();
       break;
     case 'd':
-      handler.on_day_of_month(numeric_system::standard, pad);
+      handler.on_day_of_month(numeric_system::standard);
       break;
     case 'e':
-      handler.on_day_of_month(numeric_system::standard, pad_type::space);
+      handler.on_day_of_month_space(numeric_system::standard);
       break;
     // Hour, minute, second:
     case 'H':
@@ -855,7 +831,7 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
       break;
     // Alternative representation:
     case 'E': {
-      if (ptr == end) BL_FMT_THROW(format_error("invalid format"));
+      if (ptr == end) FMT_THROW(format_error("invalid format"));
       c = *ptr++;
       switch (c) {
       case 'Y':
@@ -880,12 +856,12 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
         handler.on_utc_offset(numeric_system::alternative);
         break;
       default:
-        BL_FMT_THROW(format_error("invalid format"));
+        FMT_THROW(format_error("invalid format"));
       }
       break;
     }
     case 'O':
-      if (ptr == end) BL_FMT_THROW(format_error("invalid format"));
+      if (ptr == end) FMT_THROW(format_error("invalid format"));
       c = *ptr++;
       switch (c) {
       case 'y':
@@ -895,19 +871,19 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
         handler.on_dec_month(numeric_system::alternative);
         break;
       case 'U':
-        handler.on_dec0_week_of_year(numeric_system::alternative, pad);
+        handler.on_dec0_week_of_year(numeric_system::alternative);
         break;
       case 'W':
-        handler.on_dec1_week_of_year(numeric_system::alternative, pad);
+        handler.on_dec1_week_of_year(numeric_system::alternative);
         break;
       case 'V':
-        handler.on_iso_week_of_year(numeric_system::alternative, pad);
+        handler.on_iso_week_of_year(numeric_system::alternative);
         break;
       case 'd':
-        handler.on_day_of_month(numeric_system::alternative, pad);
+        handler.on_day_of_month(numeric_system::alternative);
         break;
       case 'e':
-        handler.on_day_of_month(numeric_system::alternative, pad_type::space);
+        handler.on_day_of_month_space(numeric_system::alternative);
         break;
       case 'w':
         handler.on_dec0_weekday(numeric_system::alternative);
@@ -931,11 +907,11 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
         handler.on_utc_offset(numeric_system::alternative);
         break;
       default:
-        BL_FMT_THROW(format_error("invalid format"));
+        FMT_THROW(format_error("invalid format"));
       }
       break;
     default:
-      BL_FMT_THROW(format_error("invalid format"));
+      FMT_THROW(format_error("invalid format"));
     }
     begin = ptr;
   }
@@ -944,92 +920,86 @@ BL_FMT_CONSTEXPR auto parse_chrono_format(const Char* begin, const Char* end,
 }
 
 template <typename Derived> struct null_chrono_spec_handler {
-  BL_FMT_CONSTEXPR void unsupported() {
+  FMT_CONSTEXPR void unsupported() {
     static_cast<Derived*>(this)->unsupported();
   }
-  BL_FMT_CONSTEXPR void on_year(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_short_year(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_offset_year() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_century(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_iso_week_based_year() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_iso_week_based_short_year() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_abbr_weekday() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_full_weekday() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_dec0_weekday(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_dec1_weekday(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_abbr_month() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_full_month() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_dec_month(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_dec0_week_of_year(numeric_system, pad_type) {
-    unsupported();
-  }
-  BL_FMT_CONSTEXPR void on_dec1_week_of_year(numeric_system, pad_type) {
-    unsupported();
-  }
-  BL_FMT_CONSTEXPR void on_iso_week_of_year(numeric_system, pad_type) {
-    unsupported();
-  }
-  BL_FMT_CONSTEXPR void on_day_of_year() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_day_of_month(numeric_system, pad_type) {
-    unsupported();
-  }
-  BL_FMT_CONSTEXPR void on_24_hour(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_12_hour(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_minute(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_second(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_datetime(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_loc_date(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_loc_time(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_us_date() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_iso_date() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_12_hour_time() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_24_hour_time() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_iso_time() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_am_pm() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_duration_value() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_duration_unit() { unsupported(); }
-  BL_FMT_CONSTEXPR void on_utc_offset(numeric_system) { unsupported(); }
-  BL_FMT_CONSTEXPR void on_tz_name() { unsupported(); }
+  FMT_CONSTEXPR void on_year(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_short_year(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_offset_year() { unsupported(); }
+  FMT_CONSTEXPR void on_century(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_iso_week_based_year() { unsupported(); }
+  FMT_CONSTEXPR void on_iso_week_based_short_year() { unsupported(); }
+  FMT_CONSTEXPR void on_abbr_weekday() { unsupported(); }
+  FMT_CONSTEXPR void on_full_weekday() { unsupported(); }
+  FMT_CONSTEXPR void on_dec0_weekday(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_dec1_weekday(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_abbr_month() { unsupported(); }
+  FMT_CONSTEXPR void on_full_month() { unsupported(); }
+  FMT_CONSTEXPR void on_dec_month(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_dec0_week_of_year(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_dec1_week_of_year(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_iso_week_of_year(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_day_of_year() { unsupported(); }
+  FMT_CONSTEXPR void on_day_of_month(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_day_of_month_space(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_24_hour(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_12_hour(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_minute(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_second(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_datetime(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_loc_date(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_loc_time(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_us_date() { unsupported(); }
+  FMT_CONSTEXPR void on_iso_date() { unsupported(); }
+  FMT_CONSTEXPR void on_12_hour_time() { unsupported(); }
+  FMT_CONSTEXPR void on_24_hour_time() { unsupported(); }
+  FMT_CONSTEXPR void on_iso_time() { unsupported(); }
+  FMT_CONSTEXPR void on_am_pm() { unsupported(); }
+  FMT_CONSTEXPR void on_duration_value() { unsupported(); }
+  FMT_CONSTEXPR void on_duration_unit() { unsupported(); }
+  FMT_CONSTEXPR void on_utc_offset(numeric_system) { unsupported(); }
+  FMT_CONSTEXPR void on_tz_name() { unsupported(); }
 };
 
 struct tm_format_checker : null_chrono_spec_handler<tm_format_checker> {
-  BL_FMT_NORETURN void unsupported() { BL_FMT_THROW(format_error("no format")); }
+  FMT_NORETURN void unsupported() { FMT_THROW(format_error("no format")); }
 
   template <typename Char>
-  BL_FMT_CONSTEXPR void on_text(const Char*, const Char*) {}
-  BL_FMT_CONSTEXPR void on_year(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_short_year(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_offset_year() {}
-  BL_FMT_CONSTEXPR void on_century(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_iso_week_based_year() {}
-  BL_FMT_CONSTEXPR void on_iso_week_based_short_year() {}
-  BL_FMT_CONSTEXPR void on_abbr_weekday() {}
-  BL_FMT_CONSTEXPR void on_full_weekday() {}
-  BL_FMT_CONSTEXPR void on_dec0_weekday(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_dec1_weekday(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_abbr_month() {}
-  BL_FMT_CONSTEXPR void on_full_month() {}
-  BL_FMT_CONSTEXPR void on_dec_month(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_dec0_week_of_year(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_dec1_week_of_year(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_iso_week_of_year(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_day_of_year() {}
-  BL_FMT_CONSTEXPR void on_day_of_month(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_24_hour(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_12_hour(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_minute(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_second(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_datetime(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_loc_date(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_loc_time(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_us_date() {}
-  BL_FMT_CONSTEXPR void on_iso_date() {}
-  BL_FMT_CONSTEXPR void on_12_hour_time() {}
-  BL_FMT_CONSTEXPR void on_24_hour_time() {}
-  BL_FMT_CONSTEXPR void on_iso_time() {}
-  BL_FMT_CONSTEXPR void on_am_pm() {}
-  BL_FMT_CONSTEXPR void on_utc_offset(numeric_system) {}
-  BL_FMT_CONSTEXPR void on_tz_name() {}
+  FMT_CONSTEXPR void on_text(const Char*, const Char*) {}
+  FMT_CONSTEXPR void on_year(numeric_system) {}
+  FMT_CONSTEXPR void on_short_year(numeric_system) {}
+  FMT_CONSTEXPR void on_offset_year() {}
+  FMT_CONSTEXPR void on_century(numeric_system) {}
+  FMT_CONSTEXPR void on_iso_week_based_year() {}
+  FMT_CONSTEXPR void on_iso_week_based_short_year() {}
+  FMT_CONSTEXPR void on_abbr_weekday() {}
+  FMT_CONSTEXPR void on_full_weekday() {}
+  FMT_CONSTEXPR void on_dec0_weekday(numeric_system) {}
+  FMT_CONSTEXPR void on_dec1_weekday(numeric_system) {}
+  FMT_CONSTEXPR void on_abbr_month() {}
+  FMT_CONSTEXPR void on_full_month() {}
+  FMT_CONSTEXPR void on_dec_month(numeric_system) {}
+  FMT_CONSTEXPR void on_dec0_week_of_year(numeric_system) {}
+  FMT_CONSTEXPR void on_dec1_week_of_year(numeric_system) {}
+  FMT_CONSTEXPR void on_iso_week_of_year(numeric_system) {}
+  FMT_CONSTEXPR void on_day_of_year() {}
+  FMT_CONSTEXPR void on_day_of_month(numeric_system) {}
+  FMT_CONSTEXPR void on_day_of_month_space(numeric_system) {}
+  FMT_CONSTEXPR void on_24_hour(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_12_hour(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_minute(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_second(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_datetime(numeric_system) {}
+  FMT_CONSTEXPR void on_loc_date(numeric_system) {}
+  FMT_CONSTEXPR void on_loc_time(numeric_system) {}
+  FMT_CONSTEXPR void on_us_date() {}
+  FMT_CONSTEXPR void on_iso_date() {}
+  FMT_CONSTEXPR void on_12_hour_time() {}
+  FMT_CONSTEXPR void on_24_hour_time() {}
+  FMT_CONSTEXPR void on_iso_time() {}
+  FMT_CONSTEXPR void on_am_pm() {}
+  FMT_CONSTEXPR void on_utc_offset(numeric_system) {}
+  FMT_CONSTEXPR void on_tz_name() {}
 };
 
 inline auto tm_wday_full_name(int wday) -> const char* {
@@ -1070,7 +1040,7 @@ template <typename T>
 struct has_member_data_tm_zone<T, void_t<decltype(T::tm_zone)>>
     : std::true_type {};
 
-#if BL_FMT_USE_TZSET
+#if FMT_USE_TZSET
 inline void tzset_once() {
   static bool init = []() -> bool {
     _tzset();
@@ -1081,20 +1051,19 @@ inline void tzset_once() {
 #endif
 
 // Converts value to Int and checks that it's in the range [0, upper).
-template <typename T, typename Int, BL_FMT_ENABLE_IF(std::is_integral<T>::value)>
+template <typename T, typename Int, FMT_ENABLE_IF(std::is_integral<T>::value)>
 inline auto to_nonnegative_int(T value, Int upper) -> Int {
   if (!std::is_unsigned<Int>::value &&
       (value < 0 || to_unsigned(value) > to_unsigned(upper))) {
-    BL_FMT_THROW(bl::fmt::format_error("chrono value is out of range"));
+    FMT_THROW(fmt::format_error("chrono value is out of range"));
   }
   return static_cast<Int>(value);
 }
-template <typename T, typename Int, BL_FMT_ENABLE_IF(!std::is_integral<T>::value)>
+template <typename T, typename Int, FMT_ENABLE_IF(!std::is_integral<T>::value)>
 inline auto to_nonnegative_int(T value, Int upper) -> Int {
-  auto int_value = static_cast<Int>(value);
-  if (int_value < 0 || value > static_cast<T>(upper))
-    BL_FMT_THROW(format_error("invalid value"));
-  return int_value;
+  if (value < 0 || value > static_cast<T>(upper))
+    FMT_THROW(format_error("invalid value"));
+  return static_cast<Int>(value);
 }
 
 constexpr auto pow10(std::uint32_t n) -> long long {
@@ -1142,31 +1111,26 @@ void write_fractional_seconds(OutputIt& out, Duration d, int precision = -1) {
 
   int leading_zeroes = (std::max)(0, num_fractional_digits - num_digits);
   if (precision < 0) {
-    BL_FMT_ASSERT(!std::is_floating_point<typename Duration::rep>::value, "");
+    FMT_ASSERT(!std::is_floating_point<typename Duration::rep>::value, "");
     if (std::ratio_less<typename subsecond_precision::period,
                         std::chrono::seconds::period>::value) {
       *out++ = '.';
-      out = detail::fill_n(out, leading_zeroes, '0');
+      out = std::fill_n(out, leading_zeroes, '0');
       out = format_decimal<Char>(out, n, num_digits).end;
     }
-  } else if (precision > 0) {
+  } else {
     *out++ = '.';
     leading_zeroes = (std::min)(leading_zeroes, precision);
+    out = std::fill_n(out, leading_zeroes, '0');
     int remaining = precision - leading_zeroes;
-    out = detail::fill_n(out, leading_zeroes, '0');
-    if (remaining < num_digits) {
-      int num_truncated_digits = num_digits - remaining;
-      n /= to_unsigned(detail::pow10(to_unsigned(num_truncated_digits)));
-      if (n) {
-        out = format_decimal<Char>(out, n, remaining).end;
-      }
+    if (remaining != 0 && remaining < num_digits) {
+      n /= to_unsigned(detail::pow10(to_unsigned(num_digits - remaining)));
+      out = format_decimal<Char>(out, n, remaining).end;
       return;
     }
-    if (n) {
-      out = format_decimal<Char>(out, n, num_digits).end;
-      remaining -= num_digits;
-    }
-    out = detail::fill_n(out, remaining, '0');
+    out = format_decimal<Char>(out, n, num_digits).end;
+    remaining -= num_digits;
+    out = std::fill_n(out, remaining, '0');
   }
 }
 
@@ -1177,7 +1141,7 @@ template <typename Duration>
 void write_floating_seconds(memory_buffer& buf, Duration duration,
                             int num_fractional_digits = -1) {
   using rep = typename Duration::rep;
-  BL_FMT_ASSERT(std::is_floating_point<rep>::value, "");
+  FMT_ASSERT(std::is_floating_point<rep>::value, "");
 
   auto val = duration.count();
 
@@ -1192,7 +1156,7 @@ void write_floating_seconds(memory_buffer& buf, Duration duration,
       num_fractional_digits = 6;
   }
 
-  bl::fmt::format_to(std::back_inserter(buf), BL_FMT_STRING("{:.{}f}"),
+  fmt::format_to(std::back_inserter(buf), FMT_STRING("{:.{}f}"),
                  std::fmod(val * static_cast<rep>(Duration::period::num) /
                                static_cast<rep>(Duration::period::den),
                            static_cast<rep>(60)),
@@ -1212,32 +1176,32 @@ class tm_writer {
   const std::tm& tm_;
 
   auto tm_sec() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_sec >= 0 && tm_.tm_sec <= 61, "");
+    FMT_ASSERT(tm_.tm_sec >= 0 && tm_.tm_sec <= 61, "");
     return tm_.tm_sec;
   }
   auto tm_min() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_min >= 0 && tm_.tm_min <= 59, "");
+    FMT_ASSERT(tm_.tm_min >= 0 && tm_.tm_min <= 59, "");
     return tm_.tm_min;
   }
   auto tm_hour() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_hour >= 0 && tm_.tm_hour <= 23, "");
+    FMT_ASSERT(tm_.tm_hour >= 0 && tm_.tm_hour <= 23, "");
     return tm_.tm_hour;
   }
   auto tm_mday() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_mday >= 1 && tm_.tm_mday <= 31, "");
+    FMT_ASSERT(tm_.tm_mday >= 1 && tm_.tm_mday <= 31, "");
     return tm_.tm_mday;
   }
   auto tm_mon() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_mon >= 0 && tm_.tm_mon <= 11, "");
+    FMT_ASSERT(tm_.tm_mon >= 0 && tm_.tm_mon <= 11, "");
     return tm_.tm_mon;
   }
   auto tm_year() const noexcept -> long long { return 1900ll + tm_.tm_year; }
   auto tm_wday() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_wday >= 0 && tm_.tm_wday <= 6, "");
+    FMT_ASSERT(tm_.tm_wday >= 0 && tm_.tm_wday <= 6, "");
     return tm_.tm_wday;
   }
   auto tm_yday() const noexcept -> int {
-    BL_FMT_ASSERT(tm_.tm_yday >= 0 && tm_.tm_yday <= 365, "");
+    FMT_ASSERT(tm_.tm_yday >= 0 && tm_.tm_yday <= 365, "");
     return tm_.tm_yday;
   }
 
@@ -1317,8 +1281,7 @@ class tm_writer {
     }
     uint32_or_64_or_128_t<long long> n = to_unsigned(year);
     const int num_digits = count_digits(n);
-    if (width > num_digits)
-      out_ = detail::fill_n(out_, width - num_digits, '0');
+    if (width > num_digits) out_ = std::fill_n(out_, width - num_digits, '0');
     out_ = format_decimal<Char>(out_, n, num_digits).end;
   }
   void write_year(long long year) {
@@ -1342,14 +1305,14 @@ class tm_writer {
     if (ns != numeric_system::standard) *out_++ = ':';
     write2(static_cast<int>(offset % 60));
   }
-  template <typename T, BL_FMT_ENABLE_IF(has_member_data_tm_gmtoff<T>::value)>
+  template <typename T, FMT_ENABLE_IF(has_member_data_tm_gmtoff<T>::value)>
   void format_utc_offset_impl(const T& tm, numeric_system ns) {
     write_utc_offset(tm.tm_gmtoff, ns);
   }
-  template <typename T, BL_FMT_ENABLE_IF(!has_member_data_tm_gmtoff<T>::value)>
+  template <typename T, FMT_ENABLE_IF(!has_member_data_tm_gmtoff<T>::value)>
   void format_utc_offset_impl(const T& tm, numeric_system ns) {
 #if defined(_WIN32) && defined(_UCRT)
-#  if BL_FMT_USE_TZSET
+#  if FMT_USE_TZSET
     tzset_once();
 #  endif
     long offset = 0;
@@ -1373,14 +1336,14 @@ class tm_writer {
 #endif
   }
 
-  template <typename T, BL_FMT_ENABLE_IF(has_member_data_tm_zone<T>::value)>
+  template <typename T, FMT_ENABLE_IF(has_member_data_tm_zone<T>::value)>
   void format_tz_name_impl(const T& tm) {
     if (is_classic_)
       out_ = write_tm_str<Char>(out_, tm.tm_zone, loc_);
     else
       format_localized('Z');
   }
-  template <typename T, BL_FMT_ENABLE_IF(!has_member_data_tm_zone<T>::value)>
+  template <typename T, FMT_ENABLE_IF(!has_member_data_tm_zone<T>::value)>
   void format_tz_name_impl(const T&) {
     format_localized('Z');
   }
@@ -1400,8 +1363,8 @@ class tm_writer {
 
   auto out() const -> OutputIt { return out_; }
 
-  BL_FMT_CONSTEXPR void on_text(const Char* begin, const Char* end) {
-    out_ = copy<Char>(begin, end, out_);
+  FMT_CONSTEXPR void on_text(const Char* begin, const Char* end) {
+    out_ = copy_str<Char>(begin, end, out_);
   }
 
   void on_abbr_weekday() {
@@ -1448,7 +1411,7 @@ class tm_writer {
       *out_++ = ' ';
       on_abbr_month();
       *out_++ = ' ';
-      on_day_of_month(numeric_system::standard, pad_type::space);
+      on_day_of_month_space(numeric_system::standard);
       *out_++ = ' ';
       on_iso_time();
       *out_++ = ' ';
@@ -1474,7 +1437,7 @@ class tm_writer {
     write_digit2_separated(buf, to_unsigned(tm_mon() + 1),
                            to_unsigned(tm_mday()),
                            to_unsigned(split_year_lower(tm_year())), '/');
-    out_ = copy<Char>(std::begin(buf), std::end(buf), out_);
+    out_ = copy_str<Char>(std::begin(buf), std::end(buf), out_);
   }
   void on_iso_date() {
     auto year = tm_year();
@@ -1490,7 +1453,7 @@ class tm_writer {
     write_digit2_separated(buf + 2, static_cast<unsigned>(year % 100),
                            to_unsigned(tm_mon() + 1), to_unsigned(tm_mday()),
                            '-');
-    out_ = copy<Char>(std::begin(buf) + offset, std::end(buf), out_);
+    out_ = copy_str<Char>(std::begin(buf) + offset, std::end(buf), out_);
   }
 
   void on_utc_offset(numeric_system ns) { format_utc_offset_impl(tm_, ns); }
@@ -1535,26 +1498,24 @@ class tm_writer {
     format_localized('m', 'O');
   }
 
-  void on_dec0_week_of_year(numeric_system ns, pad_type pad) {
+  void on_dec0_week_of_year(numeric_system ns) {
     if (is_classic_ || ns == numeric_system::standard)
-      return write2((tm_yday() + days_per_week - tm_wday()) / days_per_week,
-                    pad);
+      return write2((tm_yday() + days_per_week - tm_wday()) / days_per_week);
     format_localized('U', 'O');
   }
-  void on_dec1_week_of_year(numeric_system ns, pad_type pad) {
+  void on_dec1_week_of_year(numeric_system ns) {
     if (is_classic_ || ns == numeric_system::standard) {
       auto wday = tm_wday();
       write2((tm_yday() + days_per_week -
               (wday == 0 ? (days_per_week - 1) : (wday - 1))) /
-                 days_per_week,
-             pad);
+             days_per_week);
     } else {
       format_localized('W', 'O');
     }
   }
-  void on_iso_week_of_year(numeric_system ns, pad_type pad) {
+  void on_iso_week_of_year(numeric_system ns) {
     if (is_classic_ || ns == numeric_system::standard)
-      return write2(tm_iso_week_of_year(), pad);
+      return write2(tm_iso_week_of_year());
     format_localized('V', 'O');
   }
 
@@ -1568,10 +1529,19 @@ class tm_writer {
     write1(yday / 100);
     write2(yday % 100);
   }
-  void on_day_of_month(numeric_system ns, pad_type pad) {
-    if (is_classic_ || ns == numeric_system::standard)
-      return write2(tm_mday(), pad);
+  void on_day_of_month(numeric_system ns) {
+    if (is_classic_ || ns == numeric_system::standard) return write2(tm_mday());
     format_localized('d', 'O');
+  }
+  void on_day_of_month_space(numeric_system ns) {
+    if (is_classic_ || ns == numeric_system::standard) {
+      auto mday = to_unsigned(tm_mday()) % 100;
+      const char* d2 = digits2(mday);
+      *out_++ = mday < 10 ? ' ' : d2[0];
+      *out_++ = d2[1];
+    } else {
+      format_localized('e', 'O');
+    }
   }
 
   void on_24_hour(numeric_system ns, pad_type pad) {
@@ -1616,7 +1586,7 @@ class tm_writer {
       char buf[8];
       write_digit2_separated(buf, to_unsigned(tm_hour12()),
                              to_unsigned(tm_min()), to_unsigned(tm_sec()), ':');
-      out_ = copy<Char>(std::begin(buf), std::end(buf), out_);
+      out_ = copy_str<Char>(std::begin(buf), std::end(buf), out_);
       *out_++ = ' ';
       on_am_pm();
     } else {
@@ -1631,7 +1601,7 @@ class tm_writer {
   void on_iso_time() {
     on_24_hour_time();
     *out_++ = ':';
-    on_second(numeric_system::standard, pad_type::zero);
+    on_second(numeric_system::standard, pad_type::unspecified);
   }
 
   void on_am_pm() {
@@ -1651,38 +1621,38 @@ class tm_writer {
 struct chrono_format_checker : null_chrono_spec_handler<chrono_format_checker> {
   bool has_precision_integral = false;
 
-  BL_FMT_NORETURN void unsupported() { BL_FMT_THROW(format_error("no date")); }
+  FMT_NORETURN void unsupported() { FMT_THROW(format_error("no date")); }
 
   template <typename Char>
-  BL_FMT_CONSTEXPR void on_text(const Char*, const Char*) {}
-  BL_FMT_CONSTEXPR void on_day_of_year() {}
-  BL_FMT_CONSTEXPR void on_24_hour(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_12_hour(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_minute(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_second(numeric_system, pad_type) {}
-  BL_FMT_CONSTEXPR void on_12_hour_time() {}
-  BL_FMT_CONSTEXPR void on_24_hour_time() {}
-  BL_FMT_CONSTEXPR void on_iso_time() {}
-  BL_FMT_CONSTEXPR void on_am_pm() {}
-  BL_FMT_CONSTEXPR void on_duration_value() const {
+  FMT_CONSTEXPR void on_text(const Char*, const Char*) {}
+  FMT_CONSTEXPR void on_day_of_year() {}
+  FMT_CONSTEXPR void on_24_hour(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_12_hour(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_minute(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_second(numeric_system, pad_type) {}
+  FMT_CONSTEXPR void on_12_hour_time() {}
+  FMT_CONSTEXPR void on_24_hour_time() {}
+  FMT_CONSTEXPR void on_iso_time() {}
+  FMT_CONSTEXPR void on_am_pm() {}
+  FMT_CONSTEXPR void on_duration_value() const {
     if (has_precision_integral) {
-      BL_FMT_THROW(format_error("precision not allowed for this argument type"));
+      FMT_THROW(format_error("precision not allowed for this argument type"));
     }
   }
-  BL_FMT_CONSTEXPR void on_duration_unit() {}
+  FMT_CONSTEXPR void on_duration_unit() {}
 };
 
 template <typename T,
-          BL_FMT_ENABLE_IF(std::is_integral<T>::value&& has_isfinite<T>::value)>
+          FMT_ENABLE_IF(std::is_integral<T>::value&& has_isfinite<T>::value)>
 inline auto isfinite(T) -> bool {
   return true;
 }
 
-template <typename T, BL_FMT_ENABLE_IF(std::is_integral<T>::value)>
+template <typename T, FMT_ENABLE_IF(std::is_integral<T>::value)>
 inline auto mod(T x, int y) -> T {
   return x % static_cast<T>(y);
 }
-template <typename T, BL_FMT_ENABLE_IF(std::is_floating_point<T>::value)>
+template <typename T, FMT_ENABLE_IF(std::is_floating_point<T>::value)>
 inline auto mod(T x, int y) -> T {
   return std::fmod(x, static_cast<T>(y));
 }
@@ -1699,12 +1669,12 @@ template <typename T> struct make_unsigned_or_unchanged<T, true> {
 };
 
 template <typename Rep, typename Period,
-          BL_FMT_ENABLE_IF(std::is_integral<Rep>::value)>
+          FMT_ENABLE_IF(std::is_integral<Rep>::value)>
 inline auto get_milliseconds(std::chrono::duration<Rep, Period> d)
     -> std::chrono::duration<Rep, std::milli> {
   // this may overflow and/or the result may not fit in the
   // target type.
-#if BL_FMT_SAFE_DURATION_CAST
+#if FMT_SAFE_DURATION_CAST
   using CommonSecondsType =
       typename std::common_type<decltype(d), std::chrono::seconds>::type;
   const auto d_as_common = fmt_duration_cast<CommonSecondsType>(d);
@@ -1722,18 +1692,18 @@ inline auto get_milliseconds(std::chrono::duration<Rep, Period> d)
 }
 
 template <typename Char, typename Rep, typename OutputIt,
-          BL_FMT_ENABLE_IF(std::is_integral<Rep>::value)>
+          FMT_ENABLE_IF(std::is_integral<Rep>::value)>
 auto format_duration_value(OutputIt out, Rep val, int) -> OutputIt {
   return write<Char>(out, val);
 }
 
 template <typename Char, typename Rep, typename OutputIt,
-          BL_FMT_ENABLE_IF(std::is_floating_point<Rep>::value)>
+          FMT_ENABLE_IF(std::is_floating_point<Rep>::value)>
 auto format_duration_value(OutputIt out, Rep val, int precision) -> OutputIt {
-  auto specs = format_specs();
+  auto specs = format_specs<Char>();
   specs.precision = precision;
-  specs.type =
-      precision >= 0 ? presentation_type::fixed : presentation_type::general;
+  specs.type = precision >= 0 ? presentation_type::fixed_lower
+                              : presentation_type::general_lower;
   return write<Char>(out, val, specs);
 }
 
@@ -1774,10 +1744,8 @@ class get_locale {
 
  public:
   get_locale(bool localized, locale_ref loc) : has_locale_(localized) {
-#ifndef BL_FMT_STATIC_THOUSANDS_SEPARATOR
     if (localized)
       ::new (&locale_) std::locale(loc.template get<std::locale>());
-#endif
   }
   ~get_locale() {
     if (has_locale_) locale_.~locale();
@@ -1872,7 +1840,7 @@ struct chrono_formatter {
     }
   }
 
-  void write(Rep value, int width, pad_type pad = pad_type::zero) {
+  void write(Rep value, int width, pad_type pad = pad_type::unspecified) {
     write_sign();
     if (isnan(value)) return write_nan();
     uint32_or_64_or_128_t<int> n =
@@ -1922,10 +1890,11 @@ struct chrono_formatter {
   void on_iso_week_based_year() {}
   void on_iso_week_based_short_year() {}
   void on_dec_month(numeric_system) {}
-  void on_dec0_week_of_year(numeric_system, pad_type) {}
-  void on_dec1_week_of_year(numeric_system, pad_type) {}
-  void on_iso_week_of_year(numeric_system, pad_type) {}
-  void on_day_of_month(numeric_system, pad_type) {}
+  void on_dec0_week_of_year(numeric_system) {}
+  void on_dec1_week_of_year(numeric_system) {}
+  void on_iso_week_of_year(numeric_system) {}
+  void on_day_of_month(numeric_system) {}
+  void on_day_of_month_space(numeric_system) {}
 
   void on_day_of_year() {
     if (handle_nan_inf()) return;
@@ -2005,7 +1974,7 @@ struct chrono_formatter {
     on_24_hour_time();
     *out++ = ':';
     if (handle_nan_inf()) return;
-    on_second(numeric_system::standard, pad_type::zero);
+    on_second(numeric_system::standard, pad_type::unspecified);
   }
 
   void on_am_pm() {
@@ -2028,207 +1997,45 @@ struct chrono_formatter {
 
 #if defined(__cpp_lib_chrono) && __cpp_lib_chrono >= 201907
 using weekday = std::chrono::weekday;
-using day = std::chrono::day;
-using month = std::chrono::month;
-using year = std::chrono::year;
-using year_month_day = std::chrono::year_month_day;
 #else
 // A fallback version of weekday.
 class weekday {
  private:
-  unsigned char value_;
+  unsigned char value;
 
  public:
   weekday() = default;
-  constexpr explicit weekday(unsigned wd) noexcept
-      : value_(static_cast<unsigned char>(wd != 7 ? wd : 0)) {}
-  constexpr auto c_encoding() const noexcept -> unsigned { return value_; }
+  explicit constexpr weekday(unsigned wd) noexcept
+      : value(static_cast<unsigned char>(wd != 7 ? wd : 0)) {}
+  constexpr auto c_encoding() const noexcept -> unsigned { return value; }
 };
 
-class day {
- private:
-  unsigned char value_;
-
- public:
-  day() = default;
-  constexpr explicit day(unsigned d) noexcept
-      : value_(static_cast<unsigned char>(d)) {}
-  constexpr explicit operator unsigned() const noexcept { return value_; }
-};
-
-class month {
- private:
-  unsigned char value_;
-
- public:
-  month() = default;
-  constexpr explicit month(unsigned m) noexcept
-      : value_(static_cast<unsigned char>(m)) {}
-  constexpr explicit operator unsigned() const noexcept { return value_; }
-};
-
-class year {
- private:
-  int value_;
-
- public:
-  year() = default;
-  constexpr explicit year(int y) noexcept : value_(y) {}
-  constexpr explicit operator int() const noexcept { return value_; }
-};
-
-class year_month_day {
- private:
-  bl::fmt::year year_;
-  bl::fmt::month month_;
-  bl::fmt::day day_;
-
- public:
-  year_month_day() = default;
-  constexpr year_month_day(const year& y, const month& m, const day& d) noexcept
-      : year_(y), month_(m), day_(d) {}
-  constexpr auto year() const noexcept -> bl::fmt::year { return year_; }
-  constexpr auto month() const noexcept -> bl::fmt::month { return month_; }
-  constexpr auto day() const noexcept -> bl::fmt::day { return day_; }
-};
+class year_month_day {};
 #endif
 
-template <typename Char>
-struct formatter<weekday, Char> : private formatter<std::tm, Char> {
+// A rudimentary weekday formatter.
+template <typename Char> struct formatter<weekday, Char> {
  private:
-  bool localized_ = false;
-  bool use_tm_formatter_ = false;
+  bool localized = false;
 
  public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
+  FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
       -> decltype(ctx.begin()) {
-    auto it = ctx.begin(), end = ctx.end();
-    if (it != end && *it == 'L') {
-      ++it;
-      localized_ = true;
-      return it;
+    auto begin = ctx.begin(), end = ctx.end();
+    if (begin != end && *begin == 'L') {
+      ++begin;
+      localized = true;
     }
-    use_tm_formatter_ = it != end && *it != '}';
-    return use_tm_formatter_ ? formatter<std::tm, Char>::parse(ctx) : it;
+    return begin;
   }
 
   template <typename FormatContext>
   auto format(weekday wd, FormatContext& ctx) const -> decltype(ctx.out()) {
     auto time = std::tm();
     time.tm_wday = static_cast<int>(wd.c_encoding());
-    if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
-    detail::get_locale loc(localized_, ctx.locale());
+    detail::get_locale loc(localized, ctx.locale());
     auto w = detail::tm_writer<decltype(ctx.out()), Char>(loc, ctx.out(), time);
     w.on_abbr_weekday();
-    return w.out();
-  }
-};
-
-template <typename Char>
-struct formatter<day, Char> : private formatter<std::tm, Char> {
- private:
-  bool use_tm_formatter_ = false;
-
- public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
-      -> decltype(ctx.begin()) {
-    auto it = ctx.begin(), end = ctx.end();
-    use_tm_formatter_ = it != end && *it != '}';
-    return use_tm_formatter_ ? formatter<std::tm, Char>::parse(ctx) : it;
-  }
-
-  template <typename FormatContext>
-  auto format(day d, FormatContext& ctx) const -> decltype(ctx.out()) {
-    auto time = std::tm();
-    time.tm_mday = static_cast<int>(static_cast<unsigned>(d));
-    if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
-    detail::get_locale loc(false, ctx.locale());
-    auto w = detail::tm_writer<decltype(ctx.out()), Char>(loc, ctx.out(), time);
-    w.on_day_of_month(detail::numeric_system::standard, detail::pad_type::zero);
-    return w.out();
-  }
-};
-
-template <typename Char>
-struct formatter<month, Char> : private formatter<std::tm, Char> {
- private:
-  bool localized_ = false;
-  bool use_tm_formatter_ = false;
-
- public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
-      -> decltype(ctx.begin()) {
-    auto it = ctx.begin(), end = ctx.end();
-    if (it != end && *it == 'L') {
-      ++it;
-      localized_ = true;
-      return it;
-    }
-    use_tm_formatter_ = it != end && *it != '}';
-    return use_tm_formatter_ ? formatter<std::tm, Char>::parse(ctx) : it;
-  }
-
-  template <typename FormatContext>
-  auto format(month m, FormatContext& ctx) const -> decltype(ctx.out()) {
-    auto time = std::tm();
-    time.tm_mon = static_cast<int>(static_cast<unsigned>(m)) - 1;
-    if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
-    detail::get_locale loc(localized_, ctx.locale());
-    auto w = detail::tm_writer<decltype(ctx.out()), Char>(loc, ctx.out(), time);
-    w.on_abbr_month();
-    return w.out();
-  }
-};
-
-template <typename Char>
-struct formatter<year, Char> : private formatter<std::tm, Char> {
- private:
-  bool use_tm_formatter_ = false;
-
- public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
-      -> decltype(ctx.begin()) {
-    auto it = ctx.begin(), end = ctx.end();
-    use_tm_formatter_ = it != end && *it != '}';
-    return use_tm_formatter_ ? formatter<std::tm, Char>::parse(ctx) : it;
-  }
-
-  template <typename FormatContext>
-  auto format(year y, FormatContext& ctx) const -> decltype(ctx.out()) {
-    auto time = std::tm();
-    time.tm_year = static_cast<int>(y) - 1900;
-    if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
-    detail::get_locale loc(false, ctx.locale());
-    auto w = detail::tm_writer<decltype(ctx.out()), Char>(loc, ctx.out(), time);
-    w.on_year(detail::numeric_system::standard);
-    return w.out();
-  }
-};
-
-template <typename Char>
-struct formatter<year_month_day, Char> : private formatter<std::tm, Char> {
- private:
-  bool use_tm_formatter_ = false;
-
- public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
-      -> decltype(ctx.begin()) {
-    auto it = ctx.begin(), end = ctx.end();
-    use_tm_formatter_ = it != end && *it != '}';
-    return use_tm_formatter_ ? formatter<std::tm, Char>::parse(ctx) : it;
-  }
-
-  template <typename FormatContext>
-  auto format(year_month_day val, FormatContext& ctx) const
-      -> decltype(ctx.out()) {
-    auto time = std::tm();
-    time.tm_year = static_cast<int>(val.year()) - 1900;
-    time.tm_mon = static_cast<int>(static_cast<unsigned>(val.month())) - 1;
-    time.tm_mday = static_cast<int>(static_cast<unsigned>(val.day()));
-    if (use_tm_formatter_) return formatter<std::tm, Char>::format(time, ctx);
-    detail::get_locale loc(true, ctx.locale());
-    auto w = detail::tm_writer<decltype(ctx.out()), Char>(loc, ctx.out(), time);
-    w.on_iso_date();
     return w.out();
   }
 };
@@ -2236,14 +2043,14 @@ struct formatter<year_month_day, Char> : private formatter<std::tm, Char> {
 template <typename Rep, typename Period, typename Char>
 struct formatter<std::chrono::duration<Rep, Period>, Char> {
  private:
-  format_specs specs_;
+  format_specs<Char> specs_;
   detail::arg_ref<Char> width_ref_;
   detail::arg_ref<Char> precision_ref_;
   bool localized_ = false;
   basic_string_view<Char> format_str_;
 
  public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
+  FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
       -> decltype(ctx.begin()) {
     auto it = ctx.begin(), end = ctx.end();
     if (it == end || *it == '}') return it;
@@ -2303,41 +2110,42 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
 template <typename Char, typename Duration>
 struct formatter<std::chrono::time_point<std::chrono::system_clock, Duration>,
                  Char> : formatter<std::tm, Char> {
-  BL_FMT_CONSTEXPR formatter() {
+  FMT_CONSTEXPR formatter() {
     this->format_str_ = detail::string_literal<Char, '%', 'F', ' ', '%', 'T'>{};
   }
 
   template <typename FormatContext>
   auto format(std::chrono::time_point<std::chrono::system_clock, Duration> val,
               FormatContext& ctx) const -> decltype(ctx.out()) {
-    std::tm tm = gmtime(val);
     using period = typename Duration::period;
     if (detail::const_check(
-            period::num == 1 && period::den == 1 &&
-            !std::is_floating_point<typename Duration::rep>::value)) {
-      return formatter<std::tm, Char>::format(tm, ctx);
+            period::num != 1 || period::den != 1 ||
+            std::is_floating_point<typename Duration::rep>::value)) {
+      const auto epoch = val.time_since_epoch();
+      auto subsecs = detail::fmt_duration_cast<Duration>(
+          epoch - detail::fmt_duration_cast<std::chrono::seconds>(epoch));
+
+      if (subsecs.count() < 0) {
+        auto second =
+            detail::fmt_duration_cast<Duration>(std::chrono::seconds(1));
+        if (epoch.count() < ((Duration::min)() + second).count())
+          FMT_THROW(format_error("duration is too small"));
+        subsecs += second;
+        val -= second;
+      }
+
+      return formatter<std::tm, Char>::do_format(gmtime(val), ctx, &subsecs);
     }
-    Duration epoch = val.time_since_epoch();
-    Duration subsecs = detail::fmt_duration_cast<Duration>(
-        epoch - detail::fmt_duration_cast<std::chrono::seconds>(epoch));
-    if (subsecs.count() < 0) {
-      auto second =
-          detail::fmt_duration_cast<Duration>(std::chrono::seconds(1));
-      if (tm.tm_sec != 0)
-        --tm.tm_sec;
-      else
-        tm = gmtime(val - second);
-      subsecs += detail::fmt_duration_cast<Duration>(std::chrono::seconds(1));
-    }
-    return formatter<std::tm, Char>::do_format(tm, ctx, &subsecs);
+
+    return formatter<std::tm, Char>::format(gmtime(val), ctx);
   }
 };
 
-#if BL_FMT_USE_LOCAL_TIME
+#if FMT_USE_LOCAL_TIME
 template <typename Char, typename Duration>
 struct formatter<std::chrono::local_time<Duration>, Char>
     : formatter<std::tm, Char> {
-  BL_FMT_CONSTEXPR formatter() {
+  FMT_CONSTEXPR formatter() {
     this->format_str_ = detail::string_literal<Char, '%', 'F', ' ', '%', 'T'>{};
   }
 
@@ -2359,7 +2167,7 @@ struct formatter<std::chrono::local_time<Duration>, Char>
 };
 #endif
 
-#if BL_FMT_USE_UTC_TIME
+#if FMT_USE_UTC_TIME
 template <typename Char, typename Duration>
 struct formatter<std::chrono::time_point<std::chrono::utc_clock, Duration>,
                  Char>
@@ -2377,7 +2185,7 @@ struct formatter<std::chrono::time_point<std::chrono::utc_clock, Duration>,
 
 template <typename Char> struct formatter<std::tm, Char> {
  private:
-  format_specs specs_;
+  format_specs<Char> specs_;
   detail::arg_ref<Char> width_ref_;
 
  protected:
@@ -2402,7 +2210,7 @@ template <typename Char> struct formatter<std::tm, Char> {
   }
 
  public:
-  BL_FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
+  FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
       -> decltype(ctx.begin()) {
     auto it = ctx.begin(), end = ctx.end();
     if (it == end || *it == '}') return it;
@@ -2426,7 +2234,7 @@ template <typename Char> struct formatter<std::tm, Char> {
   }
 };
 
-BL_FMT_END_EXPORT
-BL_FMT_END_NAMESPACE
+FMT_END_EXPORT
+FMT_END_NAMESPACE
 
-#endif  // BL_FMT_CHRONO_H_
+#endif  // FMT_CHRONO_H_

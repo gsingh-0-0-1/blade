@@ -27,12 +27,10 @@ Currently, BLADE implements the following Modules:
 - **Channelizer**: Converts a time series into a frequency series.
 - **Detector**: Integrates and calculates the Stokes-I.
 - **Polarizer**: Converts a horizontal and vertical polarization into a left and right circular polarization.
-- **Caster**: Converts the input data type to another data type.
-- **Stacker**: Tiles the input data into a larger Tensor axis.
-- **Duplicator**: Copies the input data into a new Tensor.
-- **Permutator**: Transposes the input data axis into a new order.
-- **Integrator**: Sums the input data into a accumulator.
-- **Correlator**: Performs correlation on a set of antennas.
+- **Cast**: Converts the input data type to another data type.
+- **Gather**: Tiles the input data into a larger Tensor axis.
+- **Duplicate**: Copies the input data into a new Tensor.
+- **Permutation**: Transposes the input data axis into a new order.
 
 All frequency values are in Hertz and all angles are in radians!
 

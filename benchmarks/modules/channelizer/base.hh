@@ -14,16 +14,13 @@ class ChannelizerTest : CudaBenchmark {
 
     Result run(benchmark::State& state) {
         const U64 A = state.range(0);
-        const U64 F = state.range(1);
-        const U64 T = state.range(2);
-        const U64 P = state.range(3);
-        const U64 Rate = state.range(4);
+        const U64 R = state.range(1);
 
         InitAndProfile([&](){
-            config.rate = Rate;
+            config.rate = R;
             config.blockSize = 512;
 
-            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({A, F, T, P});
+            deviceInputBuf = ArrayTensor<Device::CUDA, IT>({A, 192, 8192, 2});
 
             BL_DISABLE_PRINT();
             Create(module, config, {
