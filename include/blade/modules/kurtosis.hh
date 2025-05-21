@@ -14,6 +14,7 @@ class BLADE_API Kurtosis : public Module {
     struct Config {
         // POL inputPolarization = POL::XY;
         // POL outputPolarization = POL::LR;
+        bool debugMode = false;
         U64 blockSize = 512;
     };
 

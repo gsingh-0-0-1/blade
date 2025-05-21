@@ -100,6 +100,8 @@ if __name__ == "__main__":
         # bstart = block_ind
         bend = bstart + block_size
         block_cp = full_block_cp[:, :, bstart:bend, :]
+        
+        # block_median = np.median(block_cp)
         # print(block_ind, bstart, bend, block_cp.shape)
         nants, nfreqs, nsamples, npols = block_cp.shape
         m = nsamples
@@ -124,7 +126,10 @@ if __name__ == "__main__":
         nzapped = np.sum(1 - mask)
         print("zapped", nzapped, "of", mask.shape)
         # mask = cp.logical_and(sk_arr > sk_bounds[0], sk_arr < sk_bounds[1])
-        maskedblock = block_cp * mask
+        
+        # we are replacing with 100 here since we're in debug mode
+        maskedblock = block_cp * mask + ((100 + 100j) * (1 - mask))
+        #maskedblock = (block_cp * mask) # + (block_median * (1 - mask))
         if result is not None:
             result = np.concatenate((result, maskedblock), axis = 2)
         else:

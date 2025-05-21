@@ -1,6 +1,12 @@
 #include "blade/memory/base.hh"
 #include "cuComplex.h"
 
+/*
+#include <thrust/memory.h>
+#include <thrust/host_vector.h>
+#include <thrust/sort.h>
+*/
+
 using namespace Blade;
 
 // organized by powers of two starting at 8
@@ -29,8 +35,9 @@ float SKLIM_VALS[] = {
     0.740405, 1.42332
 };
 
+
 // CUDA kernel to compute sk_array
-template<typename IT, typename OT>
+template<typename IT, typename OT, bool debugMode>
 __global__ void compute_sk_array(
     cuFloatComplex* block,
     int N_ANTS, int N_CHANS, int N_SAMPS, int N_POLS) {//, int m) {
@@ -76,6 +83,14 @@ __global__ void compute_sk_array(
     float nsamps_hi = block_size + 1.0f;
     float quotient = ((nsamps_hi) / (nsamps_lo));
 
+    // const int n = 256 * 192;
+
+    // thrust::host_vector<int> re_arr(256 * 192);
+    // thrust::host_vector<int> im_arr(256 * 192);
+
+    // float* re_arr = (float*)malloc(sizeof(float) * n);
+    // float* im_arr = (float*)malloc(sizeof(float) * n);
+    // int med_arr_ind = 0;
 
     for (int samp_start = 0; samp_start < N_SAMPS; samp_start = samp_start + block_size) {
     // for (int pol = 0; pol < N_POLS; pol++) {
@@ -110,17 +125,61 @@ __global__ void compute_sk_array(
             //printf("\tsk: %.5f\texp %.5f - %.5f\n", sk, sklim_lower, sklim_upper); 
             //if (1 == 1) {
             if (sk > sklim_upper || sk < sklim_lower) {
-                //printf("%d %d %d zapped\n", ant, chan, pol);
-                //int chan_start = ((ant * N_CHANS + chan) * N_SAMPS + 0) * N_POLS + pol;
+                // compute block median
+                /*
+                med_arr_ind = 0;
+
+                int medianbase = ant * N_CHANS * N_SAMPS * N_POLS;
+                int timeoffset = samp_start * N_POLS + pol;
+                int chanprod = N_SAMPS * N_POLS;
+
+                // float x, y;
+
+                for (int chanidx = 0; chanidx < N_CHANS; chanidx++) {
+                    int median_baseind = medianbase + (chanidx * chanprod) + timeoffset;
+                    for (int samp = 0; samp < block_size; samp++) {
+                        //int ind = medianbase + (chanidx * chanprod) + timeoffset + samp * N_POLS;
+                        median_baseind += N_POLS;
+                        // x = block[median_baseind].x;
+                        // y = block[median_baseind].y;
+
+                        re_arr[med_arr_ind] = block[median_baseind].x;
+                        im_arr[med_arr_ind] = block[median_baseind].y;
+                        med_arr_ind++;
+                    }
+                }
+                */
+
+                // thrust::sort(re_arr, re_arr + n);
+                // thrust::sort(im_arr, im_arr + n);
+                // heapSort(re_arr, n);
+                // heapSort(im_arr, n);
+
+                // TODO
+                float repl_x;
+                float repl_y;
+                // float repl_x = re_arr[n / 2];
+                // float repl_y = im_arr[n / 2];
+
+                if constexpr (debugMode) {
+                    repl_x = 100.0f;
+                    repl_y = 100.0f;
+                } else {
+                    repl_x = 0.0f;
+                    repl_y = 0.0f;
+                }
+                
                 int chan_start = baseidx * N_POLS + pol;
                 for (int j = chan_start; j < chan_start + block_size * N_POLS; j = j + N_POLS) {
-                    // memset(block[j]...(
-                    block[j].x = 0.0;
-                    block[j].y = 0.0;
+                    block[j].x = repl_x;
+                    block[j].y = repl_y;
                 }
             }
         }
     }
+
+    // free(re_arr);
+    // free(im_arr);
 }
 
 /*

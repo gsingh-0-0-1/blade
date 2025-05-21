@@ -39,7 +39,8 @@ Kurtosis<IT, OT>::Kurtosis(const Config& config,
             ),
             // Kernel templates.
             TypeInfo<IT>::name,
-            TypeInfo<OT>::name
+            TypeInfo<OT>::name,
+            config.debugMode
         )
     );
 
